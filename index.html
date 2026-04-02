@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LifeOS TMA</title>
+    <!-- Подключения -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--tg-theme-secondary-bg-color, #f8fafc);
+            color: var(--tg-theme-text-color, #0f172a);
+            -webkit-tap-highlight-color: transparent;
+            padding-bottom: 80px;
+        }
+        .card {
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--tg-theme-bg-color, #ffffff);
+            border-top: 1px solid rgba(0,0,0,0.05);
+            display: flex; justify-content: space-around; padding: 10px 0;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom));
+            z-index: 50;
+        }
+        .nav-btn {
+            flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+            color: #94a3b8; font-size: 10px; font-weight: 800; text-transform: uppercase;
+        }
+        .nav-btn.active { color: #3b82f6; }
+        .nav-btn i { font-size: 20px; }
+        .custom-input {
+            background: #f1f5f9; border-radius: 12px; padding: 12px; width: 100%;
+            outline: none; font-weight: 700; color: inherit;
+        }
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);
+            z-index: 100; display: none; align-items: flex-end;
+        }
+        .modal-content {
+            background: var(--tg-theme-bg-color, #ffffff); width: 100%; border-radius: 30px 30px 0 0;
+            padding: 24px; max-height: 90vh; overflow-y: auto;
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .set-row { display: flex; align-items: center; gap: 8px; background: #f8fafc; padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; }
+        .set-input { width: 50px; text-align: center; background: transparent; font-weight: 800; font-size: 16px; outline: none; }
+    </style>
+</head>
+<body>
+
+    <!-- ШАПКА ДАТЫ -->
+    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex justify-between items-center">
+        <button onclick="changeDate(-1)" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="text-center" onclick="goToday()">
+            <h2 id="dateDisplay" class="text-lg font-black tracking-tight">Сегодня</h2>
+            <p id="dateSubDisplay" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Загрузка...</p>
+        </div>
+        <button onclick="changeDate(1)" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-chevron-right"></i></button>
+    </header>
+
+    <main class="p-4">
+        
+        <!-- ВЬЮ: СПОРТ -->
+        <div id="view-sport" class="space-y-4">
+            <div class="flex justify-between items-center mb-2">
+                <div class="flex items-center gap-3">
+                    <h3 class="text-2xl font-black">Тренировка</h3>
+                    <button onclick="openRmModal()" class="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-lg uppercase">1RM</button>
+                </div>
+                <button onclick="openExModal()" class="w-10 h-10 bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
+            </div>
+            <div id="workoutList" class="space-y-4"></div>
+        </div>
+
+        <!-- ВЬЮ: ПИТАНИЕ -->
+        <div id="view-nutrition" class="space-y-4 hidden">
+            <div class="card bg-gradient-to-br from-orange-400 to-red-500 text-white border-0">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Калории</p>
+                        <h4 class="text-4xl font-black tabular-nums"><span id="calEaten">0</span><span class="text-xl opacity-50">/2500</span></h4>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Осталось</p>
+                        <h4 class="text-2xl font-black tabular-nums" id="calLeft">2500</h4>
+                    </div>
+                </div>
+                <div class="flex gap-2 text-center">
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[9px] uppercase opacity-70 font-bold">Белки</p><p class="font-black text-sm" id="pVal">0/160</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[9px] uppercase opacity-70 font-bold">Жиры</p><p class="font-black text-sm" id="fVal">0/70</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[9px] uppercase opacity-70 font-bold">Углеводы</p><p class="font-black text-sm" id="cVal">0/300</p></div>
+                </div>
+            </div>
+
+            <div class="card bg-sky-50 border-0 flex justify-between items-center">
+                <div>
+                    <p class="text-[10px] font-black text-sky-600/70 uppercase tracking-widest">Вода (мл)</p>
+                    <h4 class="text-3xl font-black text-sky-600 tabular-nums" id="waterVal">0 <span class="text-lg opacity-50">/ 2000</span></h4>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="addWater(250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">+250</button>
+                    <button onclick="addWater(500)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">+500</button>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mt-6 mb-2">
+                <h3 class="text-2xl font-black">Рацион</h3>
+            </div>
+            <div id="foodList" class="space-y-4"></div>
+        </div>
+
+        <!-- ВЬЮ: АНАЛИТИКА -->
+        <div id="view-analytics" class="space-y-4 hidden">
+            <h3 class="text-2xl font-black mb-4">Аналитика (7 дней)</h3>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тренировок</p><h4 id="statTotalWo" class="text-3xl font-black text-blue-500 tabular-nums">0</h4></div>
+                <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тоннаж</p><h4 id="statTonnage" class="text-3xl font-black text-green-500 tabular-nums">0<span class="text-sm">т</span></h4></div>
+            </div>
+            <div class="card">
+                <h4 class="font-black text-sm mb-4">Калории</h4>
+                <div class="h-40 relative w-full"><canvas id="chartCals"></canvas></div>
+            </div>
+            <div class="card">
+                <h4 class="font-black text-sm mb-4">БЖУ (Среднее)</h4>
+                <div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- НИЖНЯЯ ПАНЕЛЬ НАВИГАЦИИ -->
+    <nav class="bottom-nav">
+        <button onclick="switchTab('sport')" id="tab-sport" class="nav-btn active"><i class="fa-solid fa-dumbbell"></i><span>Спорт</span></button>
+        <button onclick="switchTab('nutrition')" id="tab-nutrition" class="nav-btn"><i class="fa-solid fa-utensils"></i><span>Питание</span></button>
+        <button onclick="switchTab('analytics')" id="tab-analytics" class="nav-btn"><i class="fa-solid fa-chart-pie"></i><span>Аналитика</span></button>
+    </nav>
+
+    <!-- МОДАЛКА: 1RM КАЛЬКУЛЯТОР -->
+    <div id="rmModal" class="modal-overlay" onclick="if(event.target===this) closeModal('rmModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">1RM Калькулятор</h3>
+                <button onclick="closeModal('rmModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вес (кг)</p><input type="number" id="rmW" class="custom-input text-center" oninput="calcRM()" placeholder="100"></div>
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Повторы</p><input type="number" id="rmR" class="custom-input text-center" oninput="calcRM()" placeholder="8"></div>
+            </div>
+            <div class="bg-blue-50 p-6 rounded-2xl text-center mb-4">
+                <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">Ваш максимум (1RM)</p>
+                <h4 id="rmResult" class="text-5xl font-black text-blue-600 tabular-nums">0 кг</h4>
+            </div>
+            <div id="rmPercentages" class="grid grid-cols-4 gap-2 text-center text-[10px] font-bold text-slate-500 mb-4">
+                <div class="bg-slate-50 p-2 rounded-lg">90%<br><span id="rm90" class="text-slate-800 text-xs">0</span></div>
+                <div class="bg-slate-50 p-2 rounded-lg">80%<br><span id="rm80" class="text-slate-800 text-xs">0</span></div>
+                <div class="bg-slate-50 p-2 rounded-lg">70%<br><span id="rm70" class="text-slate-800 text-xs">0</span></div>
+                <div class="bg-slate-50 p-2 rounded-lg">60%<br><span id="rm60" class="text-slate-800 text-xs">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА: ДОБАВИТЬ УПРАЖНЕНИЕ -->
+    <div id="exModal" class="modal-overlay" onclick="if(event.target===this) closeModal('exModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Упражнение</h3>
+                <button onclick="closeModal('exModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="exSearch" placeholder="Поиск упражнения..." class="custom-input mb-2" oninput="filterEx()">
+            <div id="exSearchResults" class="max-h-40 overflow-y-auto mb-4 space-y-1"></div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вес (кг)</p><input type="number" id="exWeight" class="custom-input text-center" placeholder="0"></div>
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Повторы</p><input type="number" id="exReps" class="custom-input text-center" placeholder="0"></div>
+            </div>
+            <button onclick="confirmAddEx()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Добавить</button>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА: ДОБАВИТЬ ПРОДУКТ -->
+    <div id="foodModal" class="modal-overlay" onclick="if(event.target===this) closeModal('foodModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Добавить продукт</h3>
+                <button onclick="closeModal('foodModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="hidden" id="foodMealType">
+            <input type="text" id="foodSearch" placeholder="Поиск продукта..." class="custom-input mb-2" oninput="filterFood()">
+            <div id="foodSearchResults" class="max-h-40 overflow-y-auto mb-4 space-y-1"></div>
+            
+            <input type="text" id="customFoodName" placeholder="Название" class="custom-input mb-4">
+            
+            <div class="flex justify-between items-center mb-2">
+                <p class="text-[10px] font-bold text-slate-400 uppercase">Вес (г)</p>
+                <input type="number" id="customFoodWeight" value="100" class="w-24 p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="calcFood()">
+            </div>
+            
+            <div class="grid grid-cols-4 gap-2 mb-6">
+                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Ккал</p><input type="number" id="customFoodC" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="calcFood()"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="calcFood()"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">У</p><input type="number" id="customFoodU" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="calcFood()"></div>
+            </div>
+            <button onclick="confirmAddFood()" class="w-full bg-orange-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-orange-500/30">Сохранить</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
