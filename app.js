@@ -5,8 +5,9 @@ tg.ready();
 
 // --- НАСТРОЙКИ SUPABASE ---
 const SUPABASE_URL = 'https://hvoznktittcvsqtepopp.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_mw_ldS2k_bWXSWd4ikNQCA_rCZ6OQYs'; // Вставь сюда скопированный Publishable key (sb_publishable_...)
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_KEY = 'sb_publishable_mw_ldS2k_bWXSWd4ikNQCA_rCZ6OQYs'; 
+// ФИКС: Переименовали переменную в supabaseClient, чтобы не было конфликта
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Настройка нативной кнопки Telegram
 tg.MainButton.textColor = "#ffffff";
@@ -45,49 +46,53 @@ let sportData = {};
 let charts = {};
 let currentMainButtonCallback = null;
 
-// --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE ---
+// --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE (ИСПРАВЛЕННЫЕ) ---
 async function initData() {
-    // 1. Сначала загружаем данные локально (чтобы приложение открылось моментально)
+    // 1. Быстрая локальная загрузка для моментального открытия
     try {
         sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {};
-    } catch(e) {
-        sportData = {};
-    }
-    render();
-
-    // 2. Затем тихо тянем свежие данные из Supabase
-    const userId = tg.initDataUnsafe?.user?.id || 123456789; // Берем ID пользователя из ТГ
+    } catch(e) { sportData = {}; }
     
+    render(); // Сразу рисуем интерфейс!
+
+    // 2. Фоновая загрузка из облака
+    const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) 
+                   ? window.Telegram.WebApp.initDataUnsafe.user 
+                   : { id: 123456789 }; // Фейковый ID, если открыто просто в браузере на ПК
+                   
     try {
-        let { data, error } = await supabase
+        let { data, error } = await supabaseClient
             .from('user_data')
             .select('data')
-            .eq('telegram_id', userId)
+            .eq('telegram_id', tgUser.id)
             .single();
             
         if (data && data.data) {
-            sportData = data.data; // Обновляем базу
-            localStorage.setItem('tma_sport_data', JSON.stringify(sportData)); // Синхронизируем локальный кэш
-            render(); // Перерисовываем интерфейс
+            sportData = data.data;
+            localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
+            render(); // Перерисовываем с актуальными данными из базы
         }
     } catch (err) {
-        console.error('Ошибка загрузки из Supabase:', err);
+        console.log('Нет связи с облаком, работаем локально');
     }
 }
 
 async function save() {
-    // 1. Мгновенно сохраняем локально
+    // 1. Локальное сохранение
     const dataStr = JSON.stringify(sportData);
     localStorage.setItem('tma_sport_data', dataStr);
     
-    // 2. Отправляем в облако Supabase
-    const userId = tg.initDataUnsafe?.user?.id || 123456789;
+    // 2. Отправка в облако
+    const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) 
+                   ? window.Telegram.WebApp.initDataUnsafe.user 
+                   : { id: 123456789 };
+                   
     try {
-        await supabase
+        await supabaseClient
             .from('user_data')
-            .upsert({ telegram_id: userId, data: sportData, updated_at: new Date() });
+            .upsert({ telegram_id: tgUser.id, data: sportData, updated_at: new Date() });
     } catch (err) {
-        console.error('Ошибка сохранения в Supabase:', err);
+        console.log('Ошибка отправки в облако');
     }
 }
 
