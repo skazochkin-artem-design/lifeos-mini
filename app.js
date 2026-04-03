@@ -52,12 +52,12 @@ let isCardioSelected = false;
 let currentTplType = 'workout'; 
 let currentMealForAdd = '';
 
-// --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE ---
+// --- ИНИЦИАЛИЗАЦИЯ И СОХРАНЕНИЕ (БЕЗ БЛОКИРОВКИ) ---
 async function initData() {
     setSyncStatus('loading');
     try { sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {}; } catch(e) { sportData = {}; }
     
-    if(!sportData._templates) sportData._templates = [];
+    if(!sportData._templates) sportData._templates =[];
     if(!sportData._mealTemplates) sportData._mealTemplates =[];
     
     render(); 
@@ -74,21 +74,23 @@ async function initData() {
     } catch (err) { setSyncStatus('error'); }
 }
 
-// ИСПРАВЛЕНО 1: Безопасное сохранение без блокировки UI
 function save() {
     try {
-        setSyncStatus('loading');
         localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
-        const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
-        
-        if (typeof supabaseClient !== 'undefined') {
-            supabaseClient.from('user_data').upsert({ telegram_id: tgUser.id, data: sportData, updated_at: new Date() })
-                .then(() => setSyncStatus('success'))
-                .catch(() => setSyncStatus('error'));
-        }
+        // Фоновая отправка, не блокирует UI
+        setTimeout(() => {
+            setSyncStatus('loading');
+            const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
+            if (typeof supabaseClient !== 'undefined') {
+                supabaseClient.from('user_data').upsert({ telegram_id: tgUser.id, data: sportData, updated_at: new Date() })
+                    .then(() => setSyncStatus('success'))
+                    .catch(() => setSyncStatus('error'));
+            }
+        }, 10);
     } catch (e) { console.error(e); }
 }
 
+// --- НАВИГАЦИЯ ---
 function switchTab(tab, index) {
     haptic('light');
     currentTab = tab;
@@ -194,21 +196,19 @@ function filterEx() {
 }
 
 function confirmAddEx() {
-    try {
-        const name = $('exSearch').value;
-        if(!name) { alert('Введите название!'); return; }
-        const dk = iso(pivotDate);
-        const w = $('exWeight').value;
-        const r = $('exReps').value;
-        
-        const setsCount = isCardioSelected ? 1 : 3;
-        for(let i=0; i < setsCount; i++) sportData[dk].workout.push({ n: name, w: w, r: r });
-        
-        haptic('success');
-        save(); 
-        render(); 
-        closeModal('exModal');
-    } catch(e) { console.error(e); }
+    const name = $('exSearch').value;
+    if(!name) return alert('Введите название!');
+    const dk = iso(pivotDate);
+    const w = $('exWeight').value;
+    const r = $('exReps').value;
+    
+    const setsCount = isCardioSelected ? 1 : 3;
+    for(let i=0; i < setsCount; i++) sportData[dk].workout.push({ n: name, w: w, r: r });
+    
+    haptic('success');
+    save(); 
+    render(); 
+    closeModal('exModal');
 }
 
 function addSet(name) {
@@ -325,12 +325,13 @@ function renderNutrition(dk) {
     dayData.food.forEach(f => { tc+=f.c; tp+=f.p; tf+=f.f; tu+=f.u; tfib+=(f.fib||0); });
     
     $('calEaten').innerText = tc; $('calLeft').innerText = userGoals.c - tc;
+    $('calGoalDisplay').innerText = userGoals.c;
     $('pVal').innerText = `${Math.round(tp)}/${userGoals.p}`; 
     $('fVal').innerText = `${Math.round(tf)}/${userGoals.f}`; 
     $('cVal').innerText = `${Math.round(tu)}/${userGoals.u}`;
     $('fibVal').innerText = `${Math.round(tfib)}/${userGoals.fib}`;
     
-    // ПУНКТ 3: Глобальный прогресс-бар БЖУК
+    // Глобальный прогресс-бар БЖУК
     let totalM = tp + tf + tu + tfib;
     $('globalMacroBar').innerHTML = totalM > 0 ? `
         <div class="bg-green-400" style="width:${(tp/totalM)*100}%"></div>
@@ -350,7 +351,6 @@ function renderNutrition(dk) {
         let mc=0, mp=0, mf=0, mu=0, mfib=0; 
         items.forEach(i => { mc+=i.c; mp+=i.p; mf+=i.f; mu+=i.u; mfib+=(i.fib||0); });
         
-        // ПУНКТ 3: Прогресс-бар для приема пищи
         let mTotal = mp + mf + mu + mfib;
         let mealBar = mTotal > 0 ? `
             <div class="flex h-1 w-full rounded-full overflow-hidden mt-2 opacity-80">
@@ -375,7 +375,6 @@ function renderNutrition(dk) {
             ${mealBar}
             <div class="space-y-2 mt-3">
                 ${items.length === 0 ? '<p class="text-xs text-slate-300 font-bold">Пусто</p>' : items.map(f => {
-                    // ПУНКТ 3: Прогресс-бар для продукта
                     let fTotal = f.p + f.f + f.u + (f.fib||0);
                     let foodBar = fTotal > 0 ? `
                         <div class="flex h-1 w-full rounded-full overflow-hidden mt-1.5 opacity-60">
@@ -440,7 +439,13 @@ function filterFood() {
     FOOD_DB.filter(f => f.n.toLowerCase().includes(q)).forEach(f => {
         const div = document.createElement('div');
         div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center';
-        div.innerHTML = `<span>${f.n}</span><span class="text-slate-400 text-xs">${f.c} ккал</span>`;
+        div.innerHTML = `
+            <div class="flex items-center gap-3">
+                <div class="food-img-thumb flex items-center justify-center text-slate-300"><i class="fa-solid fa-utensils text-xs"></i></div>
+                <span>${f.n}</span>
+            </div>
+            <span class="text-slate-400 text-xs">${f.c} ккал</span>
+        `;
         div.onclick = () => {
             selectedFoodBase = f; $('customFoodName').value = f.n; 
             const isPiece = f.n.includes('шт'); $('customFoodWeightLabel').innerText = isPiece ? 'Кол-во (шт)' : 'Вес (г)'; $('customFoodWeight').value = isPiece ? 1 : 100;
@@ -456,7 +461,7 @@ function filterFood() {
 async function searchFoodOnline(q) {
     const res = $('foodSearchResults');
     try {
-        const resp = await fetch(`https://ru.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,nutriments`);
+        const resp = await fetch(`https://ru.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,nutriments,image_front_small_url`);
         const data = await resp.json();
         if(data.products && data.products.length > 0) {
             data.products.forEach(p => {
@@ -467,11 +472,21 @@ async function searchFoodOnline(q) {
                     p: Math.round(p.nutriments.proteins || 0),
                     f: Math.round(p.nutriments.fat || 0),
                     u: Math.round(p.nutriments.carbohydrates || 0),
-                    fib: Math.round(p.nutriments.fiber_100g || 0)
+                    fib: Math.round(p.nutriments.fiber_100g || 0),
+                    img: p.image_front_small_url || ''
                 };
                 const div = document.createElement('div');
                 div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center text-blue-800 bg-blue-50/50';
-                div.innerHTML = `<span>🌐 ${f.n}</span><span class="text-blue-400 text-xs">${f.c} ккал</span>`;
+                
+                const imgHtml = f.img ? `<img src="${f.img}" class="food-img-thumb">` : `<div class="food-img-thumb flex items-center justify-center text-blue-300"><i class="fa-solid fa-globe text-xs"></i></div>`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        ${imgHtml}
+                        <span>${f.n}</span>
+                    </div>
+                    <span class="text-blue-400 text-xs">${f.c} ккал</span>
+                `;
                 div.onclick = () => {
                     selectedFoodBase = f; $('customFoodName').value = f.n; 
                     $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = 100;
@@ -502,23 +517,21 @@ function calcFood() {
 }
 
 function confirmAddFood() {
-    try {
-        const name = $('customFoodName').value;
-        if(!name) { alert('Введите название!'); return; }
-        const dk = iso(pivotDate);
-        sportData[dk].food.push({ 
-            type: currentMealForAdd, n: name,
-            w: parseFloat($('customFoodWeight').value)||100, p: parseFloat($('customFoodP').value)||0,
-            f: parseFloat($('customFoodF').value)||0, u: parseFloat($('customFoodU').value)||0, 
-            fib: parseFloat($('customFoodFib').value)||0, c: parseInt($('customFoodC').value)||0 
-        });
-        haptic('success'); save(); render(); closeModal('foodModal');
-    } catch(e) { console.error(e); }
+    const name = $('customFoodName').value;
+    if(!name) return alert('Введите название!');
+    const dk = iso(pivotDate);
+    sportData[dk].food.push({ 
+        type: currentMealForAdd, n: name,
+        w: parseFloat($('customFoodWeight').value)||100, p: parseFloat($('customFoodP').value)||0,
+        f: parseFloat($('customFoodF').value)||0, u: parseFloat($('customFoodU').value)||0, 
+        fib: parseFloat($('customFoodFib').value)||0, c: parseInt($('customFoodC').value)||0 
+    });
+    haptic('success'); save(); render(); closeModal('foodModal');
 }
 
 function deleteFood(idx) { haptic('medium'); sportData[iso(pivotDate)].food.splice(idx, 1); save(); render(); }
 
-// ПУНКТ 2: Сканер штрих-кодов (QuaggaJS)
+// --- СКАНЕР ШТРИХ-КОДОВ (QUAGGA) ---
 let isScanning = false;
 function scanBarcode() {
     haptic('heavy');
@@ -535,7 +548,7 @@ function scanBarcode() {
         inputStream: { name: "Live", type: "LiveStream", target: container },
         decoder: { readers: ["ean_reader", "ean_8_reader"] }
     }, function(err) {
-        if (err) { console.error(err); alert('Ошибка доступа к камере'); container.style.display = 'none'; isScanning = false; return; }
+        if (err) { alert('Ошибка камеры'); container.style.display = 'none'; isScanning = false; return; }
         Quagga.start();
     });
     
@@ -606,7 +619,7 @@ function renderAnalytics() {
             { label: 'Углеводы', data: u, backgroundColor: '#3b82f6', borderRadius: 2 },
             { label: 'Клетчатка', data: fib, backgroundColor: '#eab308', borderRadius: 2 }
         ] 
-    });
+    }, { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { display: false } } } });
     
     const avgP = p.reduce((a,b)=>a+b,0)/7, avgF = f.reduce((a,b)=>a+b,0)/7, avgU = u.reduce((a,b)=>a+b,0)/7;
     drawChart('chartMacros', 'doughnut', {
@@ -615,18 +628,18 @@ function renderAnalytics() {
     }, { cutout: '70%', plugins: { legend: { position: 'right' } } });
 
     renderCalendar();
+    populateExSelect();
 }
 
-// ПУНКТ 4: Сворачивание календаря
 function toggleCalendar() {
     const wrap = $('calendarWrapper');
     const icon = $('calToggleIcon');
     if(wrap.style.maxHeight === '0px' || wrap.style.maxHeight === '') {
         wrap.style.maxHeight = '300px';
-        icon.style.transform = 'rotate(180deg)';
+        icon.style.transform = 'rotate(0deg)';
     } else {
         wrap.style.maxHeight = '0px';
-        icon.style.transform = 'rotate(0deg)';
+        icon.style.transform = 'rotate(180deg)';
     }
 }
 
@@ -692,6 +705,51 @@ function openDayDetails(dk) {
         content.innerHTML = html;
     }
     $('dayModal').style.display = 'flex';
+}
+
+function populateExSelect() {
+    const select = $('analyticsExSelect');
+    if(!select) return;
+    const exSet = new Set();
+    Object.values(sportData).forEach(d => d.workout?.forEach(w => exSet.add(w.n)));
+    
+    select.innerHTML = '<option value="">Выберите упражнение...</option>';
+    Array.from(exSet).sort().forEach(ex => {
+        select.innerHTML += `<option value="${ex}">${ex}</option>`;
+    });
+}
+
+function renderExProgressChart() {
+    const exName = $('analyticsExSelect').value;
+    if(!exName) {
+        if(charts['chartExProgress']) charts['chartExProgress'].destroy();
+        return;
+    }
+    
+    const dates = [];
+    const maxWeights =[];
+    
+    const now = new Date();
+    for(let i=29; i>=0; i--) {
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        const dk = iso(d);
+        const dayData = sportData[dk];
+        
+        if(dayData && dayData.workout) {
+            const sets = dayData.workout.filter(w => w.n === exName);
+            if(sets.length > 0) {
+                dates.push(d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}));
+                let maxW = 0;
+                sets.forEach(s => { if(parseFloat(s.w) > maxW) maxW = parseFloat(s.w); });
+                maxWeights.push(maxW);
+            }
+        }
+    }
+    
+    drawChart('chartExProgress', 'line', {
+        labels: dates,
+        datasets:[{ label: 'Макс. вес (кг)', data: maxWeights, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }]
+    });
 }
 
 function drawChart(id, type, data, opts={}) {
