@@ -15,23 +15,24 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--tg-theme-secondary-bg-color, #f8fafc); color: var(--tg-theme-text-color, #0f172a); -webkit-tap-highlight-color: transparent; padding-bottom: 100px; }
         .card { background-color: var(--tg-theme-bg-color, #ffffff); border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 16px; margin-bottom: 16px; position: relative; overflow: hidden; }
         
-        /* ПУНКТ 1: Нижнее меню поднято и добавлен слайдер */
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-bg-color, #ffffff); border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-around; padding: 10px 0; padding-bottom: calc(25px + env(safe-area-inset-bottom)); z-index: 50; }
-        .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--tg-theme-hint-color, #94a3b8); font-size: 10px; font-weight: 800; text-transform: uppercase; z-index: 10; transition: color 0.3s; }
+        .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--tg-theme-hint-color, #94a3b8); font-size: 10px; font-weight: 800; text-transform: uppercase; z-index: 10; transition: color 0.3s; background: transparent; border: none; outline: none; }
         .nav-btn.active { color: var(--tg-theme-button-color, #3b82f6); }
         .nav-btn i { font-size: 20px; transition: transform 0.3s; }
         .nav-btn.active i { transform: translateY(-2px); }
-        #nav-slider { position: absolute; top: 5px; height: 45px; width: 30%; background: #eff6ff; border-radius: 16px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 0; }
-        
-        .custom-input { background: var(--tg-theme-secondary-bg-color, #f1f5f9); border-radius: 12px; padding: 12px; width: 100%; outline: none; font-weight: 700; color: inherit; }
+        .nav-slider-container { position: absolute; top: 5px; left: 0; width: 100%; height: 45px; z-index: 0; pointer-events: none; }
+        #nav-slider { position: absolute; top: 0; left: 0; height: 100%; width: 33.33%; display: flex; justify-content: center; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #nav-slider-bg { width: 60%; height: 100%; background: var(--tg-theme-secondary-bg-color, #eff6ff); border-radius: 16px; }
+
+        .custom-input { background: var(--tg-theme-secondary-bg-color, #f1f5f9); border-radius: 12px; padding: 12px; width: 100%; outline: none; font-weight: 700; color: inherit; border: none; }
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 100; display: none; align-items: flex-end; }
         .modal-content { background: var(--tg-theme-bg-color, #ffffff); width: 100%; border-radius: 30px 30px 0 0; padding: 24px; padding-bottom: 40px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .set-row { display: flex; align-items: center; gap: 8px; background: var(--tg-theme-secondary-bg-color, #f8fafc); padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; }
-        .set-input { width: 50px; text-align: center; background: transparent; font-weight: 800; font-size: 16px; outline: none; color: var(--tg-theme-text-color, #000); }
+        .set-input { width: 50px; text-align: center; background: transparent; font-weight: 800; font-size: 16px; outline: none; color: var(--tg-theme-text-color, #000); border: none; }
         
-        /* ПУНКТ 2: Анимация воды */
-        #waterFill { position: absolute; bottom: 0; left: 0; right: 0; background: #bae6fd; z-index: 0; transition: height 0.5s ease-in-out; }
+        .water-card { overflow: hidden; z-index: 1; }
+        #waterFill { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(59, 130, 246, 0.15); z-index: -1; transition: height 0.5s ease-in-out; }
     </style>
 </head>
 <body>
@@ -49,6 +50,7 @@
     </header>
 
     <main class="p-4">
+        
         <!-- ВЬЮ: СПОРТ -->
         <div id="view-sport" class="space-y-4">
             <div class="flex justify-between items-center mb-2">
@@ -57,7 +59,8 @@
                     <button onclick="openRmModal()" class="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-lg uppercase">1RM</button>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="shareWorkout()" class="w-10 h-10 bg-slate-100 text-blue-500 rounded-full shadow-sm flex items-center justify-center"><i class="fa-solid fa-share-nodes"></i></button>
+                    <button onclick="openSaveTplModal('workout')" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full shadow-sm flex items-center justify-center" title="Сохранить шаблон"><i class="fa-solid fa-floppy-disk"></i></button>
+                    <button onclick="openLoadTplModal('workout')" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full shadow-sm flex items-center justify-center" title="Загрузить шаблон"><i class="fa-solid fa-folder-open"></i></button>
                     <button onclick="openExModal()" class="w-10 h-10 bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
@@ -84,8 +87,7 @@
                 </div>
             </div>
 
-            <!-- ПУНКТ 2: Плашка воды -->
-            <div class="card bg-sky-50 border-0 flex justify-between items-center" style="background-color: var(--tg-theme-secondary-bg-color);">
+            <div class="card water-card border-0 flex justify-between items-center" style="background-color: var(--tg-theme-secondary-bg-color);">
                 <div id="waterFill" style="height: 0%;"></div>
                 <div class="relative z-10">
                     <p class="text-[10px] font-black text-sky-600/70 uppercase tracking-widest">Вода (мл)</p>
@@ -127,11 +129,14 @@
             <div class="card"><h4 class="font-black text-sm mb-4">Калории</h4><div class="h-40 relative w-full"><canvas id="chartCals"></canvas></div></div>
             <div class="card"><h4 class="font-black text-sm mb-4">БЖУ (Среднее)</h4><div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div></div>
         </div>
+
     </main>
 
     <!-- НИЖНЯЯ ПАНЕЛЬ НАВИГАЦИИ -->
-    <nav class="bottom-nav relative">
-        <div id="nav-slider"></div>
+    <nav class="bottom-nav">
+        <div class="nav-slider-container">
+            <div id="nav-slider"><div id="nav-slider-bg"></div></div>
+        </div>
         <button onclick="switchTab('sport', 0)" id="tab-sport" class="nav-btn active"><i class="fa-solid fa-dumbbell"></i><span>Спорт</span></button>
         <button onclick="switchTab('nutrition', 1)" id="tab-nutrition" class="nav-btn"><i class="fa-solid fa-utensils"></i><span>Питание</span></button>
         <button onclick="switchTab('analytics', 2)" id="tab-analytics" class="nav-btn"><i class="fa-solid fa-chart-pie"></i><span>Аналитика</span></button>
@@ -183,12 +188,10 @@
             <div id="exSearchResults" class="max-h-40 overflow-y-auto mb-4 space-y-1"></div>
             
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <!-- ПУНКТ 8: Динамические лейблы для кардио -->
                 <div><p id="exInput1Label" class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вес (кг)</p><input type="number" id="exWeight" class="custom-input text-center" placeholder="0"></div>
                 <div><p id="exInput2Label" class="text-[10px] font-bold text-slate-400 uppercase mb-1">Повторы</p><input type="number" id="exReps" class="custom-input text-center" placeholder="0"></div>
             </div>
-            <!-- ПУНКТ 7: Вернули кнопку -->
-            <button onclick="confirmAddEx()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Добавить</button>
+            <button onclick="confirmAddEx()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Добавить упражнение</button>
         </div>
     </div>
 
@@ -202,7 +205,7 @@
             <input type="hidden" id="foodMealType">
             
             <div class="flex gap-2 mb-2">
-                <input type="text" id="foodSearch" placeholder="Поиск продукта..." class="custom-input flex-1" oninput="filterFood()">
+                <input type="text" id="foodSearch" placeholder="Поиск продукта (локально и в сети)..." class="custom-input flex-1" oninput="filterFood()">
                 <button onclick="scanBarcode()" class="w-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg"><i class="fa-solid fa-barcode"></i></button>
             </div>
             
@@ -211,19 +214,40 @@
             <input type="text" id="customFoodName" placeholder="Название" class="custom-input mb-4">
             
             <div class="flex justify-between items-center mb-2">
-                <!-- ПУНКТ 5: Динамический лейбл (граммы/штуки) -->
                 <p id="customFoodWeightLabel" class="text-[10px] font-bold text-slate-400 uppercase">Вес (г)</p>
-                <input type="number" id="customFoodWeight" value="100" class="w-24 p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="calcFood()">
+                <input type="number" id="customFoodWeight" value="100" class="w-24 p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onWeightChange()">
             </div>
             
             <div class="grid grid-cols-4 gap-2 mb-6">
                 <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Ккал</p><input type="number" id="customFoodC" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" readonly></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" readonly></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" readonly></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">У</p><input type="number" id="customFoodU" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" readonly></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">У</p><input type="number" id="customFoodU" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onMacroChange()"></div>
             </div>
-            <!-- ПУНКТ 6: Вернули кнопку -->
-            <button onclick="confirmAddFood()" class="w-full bg-orange-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-orange-500/30">Сохранить</button>
+            <button onclick="confirmAddFood()" class="w-full bg-orange-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-orange-500/30">Сохранить продукт</button>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА: СОХРАНИТЬ ШАБЛОН -->
+    <div id="saveTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('saveTplModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Сохранить как шаблон</h3>
+                <button onclick="closeModal('saveTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="tplNameInput" placeholder="Название шаблона (напр. День Ног)" class="custom-input mb-6">
+            <button onclick="confirmSaveTemplate()" class="w-full bg-slate-900 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg">Сохранить</button>
+        </div>
+    </div>
+
+    <!-- МОДАЛКА: ЗАГРУЗИТЬ ШАБЛОН -->
+    <div id="loadTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('loadTplModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Мои шаблоны</h3>
+                <button onclick="closeModal('loadTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="tplList" class="space-y-2 max-h-60 overflow-y-auto"></div>
         </div>
     </div>
 
