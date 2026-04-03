@@ -33,6 +33,8 @@
         
         .water-card { overflow: hidden; z-index: 1; }
         #waterFill { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(59, 130, 246, 0.15); z-index: -1; transition: height 0.5s ease-in-out; }
+        
+        .food-img-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -73,17 +75,19 @@
                 <div class="flex justify-between items-center mb-4">
                     <div>
                         <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Калории</p>
-                        <h4 class="text-4xl font-black tabular-nums"><span id="calEaten">0</span><span class="text-xl opacity-50">/2500</span></h4>
+                        <h4 class="text-4xl font-black tabular-nums"><span id="calEaten">0</span><span class="text-xl opacity-50">/<span id="calGoalDisplay">2500</span></span></h4>
                     </div>
-                    <div class="text-right">
+                    <div class="text-right flex flex-col items-end">
+                        <button onclick="openGoalModal()" class="mb-1 text-white/70 hover:text-white"><i class="fa-solid fa-gear"></i></button>
                         <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Осталось</p>
                         <h4 class="text-2xl font-black tabular-nums" id="calLeft">2500</h4>
                     </div>
                 </div>
                 <div class="flex gap-2 text-center">
-                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[9px] uppercase opacity-70 font-bold">Белки</p><p class="font-black text-sm" id="pVal">0/160</p></div>
-                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[9px] uppercase opacity-70 font-bold">Жиры</p><p class="font-black text-sm" id="fVal">0/70</p></div>
-                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[9px] uppercase opacity-70 font-bold">Углеводы</p><p class="font-black text-sm" id="cVal">0/300</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-green-200">Белки</p><p class="font-black text-sm" id="pVal">0/160</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-red-200">Жиры</p><p class="font-black text-sm" id="fVal">0/70</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-blue-200">Углеводы</p><p class="font-black text-sm" id="cVal">0/300</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-yellow-200">Клетчатка</p><p class="font-black text-sm" id="fibVal">0/30</p></div>
                 </div>
             </div>
 
@@ -94,8 +98,8 @@
                     <h4 class="text-3xl font-black text-sky-600 tabular-nums" id="waterVal">0 <span class="text-lg opacity-50">/ 2000</span></h4>
                 </div>
                 <div class="flex gap-2 relative z-10">
+                    <button onclick="addWater(-250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">-250</button>
                     <button onclick="addWater(250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">+250</button>
-                    <button onclick="addWater(500)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">+500</button>
                 </div>
             </div>
 
@@ -108,26 +112,44 @@
         <!-- ВЬЮ: АНАЛИТИКА -->
         <div id="view-analytics" class="space-y-4 hidden">
             <h3 class="text-2xl font-black mb-4">Аналитика</h3>
+            
+            <!-- КАЛЕНДАРЬ -->
             <div class="card">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-2 cursor-pointer" onclick="toggleCalendar()">
                     <h4 class="font-black text-sm">Календарь тренировок</h4>
-                    <div class="flex gap-2 items-center">
+                    <i id="calToggleIcon" class="fa-solid fa-chevron-up text-slate-400 transition-transform"></i>
+                </div>
+                <div id="calendarWrapper" class="transition-all duration-300 overflow-hidden">
+                    <div class="flex justify-between items-center mb-4 mt-2">
                         <button onclick="changeCalMonth(-1)" class="w-6 h-6 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-left text-[10px]"></i></button>
-                        <span id="calMonthLabel" class="text-xs font-bold text-slate-700 w-20 text-center"></span>
+                        <span id="calMonthLabel" class="text-xs font-bold text-slate-700 w-24 text-center"></span>
                         <button onclick="changeCalMonth(1)" class="w-6 h-6 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-right text-[10px]"></i></button>
                     </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2">
+                        <div>ПН</div><div>ВТ</div><div>СР</div><div>ЧТ</div><div>ПТ</div><div>СБ</div><div>ВС</div>
+                    </div>
+                    <div id="analyticsCalendar" class="grid grid-cols-7 gap-1 text-center"></div>
                 </div>
-                <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2">
-                    <div>ПН</div><div>ВТ</div><div>СР</div><div>ЧТ</div><div>ПТ</div><div>СБ</div><div>ВС</div>
-                </div>
-                <div id="analyticsCalendar" class="grid grid-cols-7 gap-1 text-center"></div>
             </div>
+
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тренировок (7 дн)</p><h4 id="statTotalWo" class="text-3xl font-black text-blue-500 tabular-nums">0</h4></div>
                 <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тоннаж (7 дн)</p><h4 id="statTonnage" class="text-3xl font-black text-green-500 tabular-nums">0<span class="text-sm">т</span></h4></div>
             </div>
-            <div class="card"><h4 class="font-black text-sm mb-4">Калории</h4><div class="h-40 relative w-full"><canvas id="chartCals"></canvas></div></div>
-            <div class="card"><h4 class="font-black text-sm mb-4">БЖУ (Среднее)</h4><div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div></div>
+            
+            <div class="card"><h4 class="font-black text-sm mb-4">Калории (7 дней)</h4><div class="h-40 relative w-full"><canvas id="chartCals"></canvas></div></div>
+            
+            <div class="card"><h4 class="font-black text-sm mb-4">БЖУК (Среднее за 7 дней)</h4><div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div></div>
+
+            <div class="card">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-black text-sm">Прогресс упражнений</h4>
+                </div>
+                <select id="analyticsExSelect" onchange="renderExProgressChart()" class="custom-input mb-4 text-xs py-2">
+                    <option value="">Выберите упражнение...</option>
+                </select>
+                <div class="h-40 relative w-full"><canvas id="chartExProgress"></canvas></div>
+            </div>
         </div>
 
     </main>
@@ -141,6 +163,27 @@
         <button onclick="switchTab('nutrition', 1)" id="tab-nutrition" class="nav-btn"><i class="fa-solid fa-utensils"></i><span>Питание</span></button>
         <button onclick="switchTab('analytics', 2)" id="tab-analytics" class="nav-btn"><i class="fa-solid fa-chart-pie"></i><span>Аналитика</span></button>
     </nav>
+
+    <!-- МОДАЛКА: НАСТРОЙКИ ЦЕЛЕЙ -->
+    <div id="goalModal" class="modal-overlay" onclick="if(event.target===this) closeModal('goalModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Цели на день</h3>
+                <button onclick="closeModal('goalModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Калории</p><input type="number" id="goalC" class="custom-input text-center"></div>
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вода (мл)</p><input type="number" id="goalWater" class="custom-input text-center"></div>
+            </div>
+            <div class="grid grid-cols-4 gap-2 mb-6">
+                <div class="text-center"><p class="text-[10px] font-bold text-green-500 uppercase mb-1">Белки</p><input type="number" id="goalP" class="custom-input text-center px-1"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-red-500 uppercase mb-1">Жиры</p><input type="number" id="goalF" class="custom-input text-center px-1"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-blue-500 uppercase mb-1">Угли</p><input type="number" id="goalU" class="custom-input text-center px-1"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-yellow-500 uppercase mb-1">Клетч</p><input type="number" id="goalFib" class="custom-input text-center px-1"></div>
+            </div>
+            <button onclick="saveGoals()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Сохранить цели</button>
+        </div>
+    </div>
 
     <!-- МОДАЛКА: ДЕТАЛИ ДНЯ -->
     <div id="dayModal" class="modal-overlay" onclick="if(event.target===this) closeModal('dayModal')">
@@ -218,11 +261,12 @@
                 <input type="number" id="customFoodWeight" value="100" class="w-24 p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onWeightChange()">
             </div>
             
-            <div class="grid grid-cols-4 gap-2 mb-6">
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Ккал</p><input type="number" id="customFoodC" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" readonly></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onMacroChange()"></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onMacroChange()"></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400">У</p><input type="number" id="customFoodU" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onMacroChange()"></div>
+            <div class="grid grid-cols-5 gap-2 mb-6">
+                <div class="text-center"><p class="text-[9px] font-bold text-slate-400">Ккал</p><input type="number" id="customFoodC" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" readonly></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-green-500">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-red-500">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-blue-500">У</p><input type="number" id="customFoodU" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-yellow-500">Кл</p><input type="number" id="customFoodFib" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
             </div>
             <button onclick="confirmAddFood()" class="w-full bg-orange-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-orange-500/30">Сохранить продукт</button>
         </div>
