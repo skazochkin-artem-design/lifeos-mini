@@ -1,765 +1,314 @@
-const tg = window.Telegram.WebApp;
-tg.expand();
-tg.ready();
-
-// ВАЖНО: Вставь свои ключи Supabase!
-const SUPABASE_URL = 'https://hvoznktittcvsqtepopp.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_mw_ldS2k_bWXSWd4ikNQCA_rCZ6OQYs'; 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-const $ = id => document.getElementById(id);
-const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-function haptic(style = 'light') { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style); }
-
-function setSyncStatus(status) {
-    const el = $('syncStatus');
-    if(!el) return;
-    if(status === 'loading') el.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-blue-400 animate-pulse"></i>';
-    else if(status === 'success') { el.innerHTML = '<i class="fa-solid fa-check text-green-500"></i>'; setTimeout(() => { el.innerHTML = '<i class="fa-solid fa-cloud text-slate-300"></i>'; }, 2000); }
-    else if(status === 'error') el.innerHTML = '<i class="fa-solid fa-cloud-xmark text-red-500"></i>';
-    else el.innerHTML = '<i class="fa-solid fa-cloud text-slate-300"></i>';
-}
-
-const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Подъем на бицепс (штанга)","Молотки","Концентрированный подъем","Французский жим","Разгибания на блоке","Планка","Скручивания","Подъем ног в висе","Русский твист","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи"].sort();
-const CARDIO_LIST =['бег', 'эллипс', 'велотренажер', 'гребля', 'скакалка', 'берпи', 'ходьба', 'степпер'];
-
-const FOOD_DB =[
-    {n:"Гречка (сухая)", c:330, p:12, f:3, u:72, fib: 10},
-    {n:"Овсянка", c:360, p:12, f:6, u:60, fib: 11},
-    {n:"Рис белый", c:360, p:7, f:1, u:79, fib: 1},
-    {n:"Макароны тв. сортов", c:350, p:12, f:1, u:70, fib: 3},
-    {n:"Куриная грудка (сырая)", c:113, p:23, f:2, u:0, fib: 0},
-    {n:"Говядина постная", c:180, p:20, f:10, u:0, fib: 0},
-    {n:"Яйцо (1шт)", c:70, p:6, f:5, u:0, fib: 0}, 
-    {n:"Творог 5%", c:121, p:17, f:5, u:2, fib: 0},
-    {n:"Банан (1шт)", c:105, p:1, f:0, u:27, fib: 3},
-    {n:"Яблоко (1шт)", c:95, p:0, f:0, u:25, fib: 4},
-    {n:"Огурец", c:15, p:1, f:0, u:3, fib: 1},
-    {n:"Помидор", c:20, p:1, f:0, u:4, fib: 1},
-    {n:"Масло оливковое", c:884, p:0, f:100, u:0, fib: 0},
-    {n:"Протеин (скуп 30г)", c:120, p:24, f:1, u:3, fib: 0}
-];
-
-let pivotDate = new Date();
-let currentTab = 'sport';
-let userGoals = JSON.parse(localStorage.getItem('tma_user_goals')) || { c: 2500, p: 160, f: 70, u: 300, fib: 30, water: 2000 };
-let sportData = {};
-let charts = {};
-let calPivot = new Date();
-
-let selectedFoodBase = null;
-let isCardioSelected = false;
-let currentTplType = 'workout'; 
-let currentMealForAdd = '';
-
-// --- ИНИЦИАЛИЗАЦИЯ И СОХРАНЕНИЕ (БЕЗ БЛОКИРОВКИ) ---
-async function initData() {
-    setSyncStatus('loading');
-    try { sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {}; } catch(e) { sportData = {}; }
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LifeOS TMA</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Библиотека сканера -->
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap" rel="stylesheet">
     
-    if(!sportData._templates) sportData._templates =[];
-    if(!sportData._mealTemplates) sportData._mealTemplates =[];
-    
-    render(); 
-    const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
-    try {
-        let { data, error } = await supabaseClient.from('user_data').select('data').eq('telegram_id', tgUser.id).single();
-        if (data && data.data) {
-            sportData = data.data;
-            if(!sportData._templates) sportData._templates =[];
-            if(!sportData._mealTemplates) sportData._mealTemplates =[];
-            localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
-            render(); setSyncStatus('success');
-        } else setSyncStatus('idle');
-    } catch (err) { setSyncStatus('error'); }
-}
-
-function save() {
-    try {
-        localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
-        // Фоновая отправка, не блокирует UI
-        setTimeout(() => {
-            setSyncStatus('loading');
-            const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
-            if (typeof supabaseClient !== 'undefined') {
-                supabaseClient.from('user_data').upsert({ telegram_id: tgUser.id, data: sportData, updated_at: new Date() })
-                    .then(() => setSyncStatus('success'))
-                    .catch(() => setSyncStatus('error'));
-            }
-        }, 10);
-    } catch (e) { console.error(e); }
-}
-
-// --- НАВИГАЦИЯ ---
-function switchTab(tab, index) {
-    haptic('light');
-    currentTab = tab;
-    const slider = $('nav-slider');
-    if(slider && index !== undefined) slider.style.transform = `translateX(${index * 100}%)`;
-
-    ['sport', 'nutrition', 'analytics'].forEach(t => {
-        const btn = $(`tab-${t}`); const view = $(`view-${t}`);
-        if(btn) btn.classList.toggle('active', tab === t);
-        if(view) view.classList.toggle('hidden', tab !== t);
-    });
-    render();
-}
-
-function changeDate(delta) { haptic('light'); pivotDate.setDate(pivotDate.getDate() + delta); render(); }
-function goToday() { haptic('light'); pivotDate = new Date(); render(); }
-function closeModal(id) { $(id).style.display = 'none'; }
-
-function render() {
-    const dk = iso(pivotDate);
-    const isToday = dk === iso(new Date());
-    $('dateDisplay').innerText = isToday ? 'Сегодня' : pivotDate.toLocaleDateString('ru-RU', {weekday: 'long'});
-    $('dateSubDisplay').innerText = pivotDate.toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'});
-
-    if(!sportData[dk]) sportData[dk] = { workout: [], food:[], water: 0, activeMeals:['Завтрак', 'Обед', 'Ужин', 'Перекус'] };
-
-    if (currentTab === 'sport') renderSport(dk);
-    if (currentTab === 'nutrition') renderNutrition(dk);
-    if (currentTab === 'analytics') renderAnalytics();
-}
-
-// === МОДУЛЬ СПОРТА ===
-function renderSport(dk) {
-    const list = $('workoutList');
-    const workout = sportData[dk].workout;
-    
-    if (workout.length === 0) {
-        list.innerHTML = '<div class="text-center py-10 text-slate-400 font-bold"><i class="fa-solid fa-dumbbell text-4xl mb-3 opacity-20"></i><p>Нет тренировок</p></div>';
-        return;
-    }
-
-    const groups =[];
-    workout.forEach((w, i) => {
-        const last = groups[groups.length - 1];
-        if (last && last.name === w.n) last.sets.push({...w, idx: i});
-        else groups.push({ name: w.n, sets:[{...w, idx: i}] });
-    });
-
-    list.innerHTML = groups.map(g => {
-        const isCardio = CARDIO_LIST.some(c => g.name.toLowerCase().includes(c));
-        const label1 = isCardio ? 'мин' : 'кг';
-        const label2 = isCardio ? 'ур' : '×';
-
-        return `
-        <div class="card">
-            <div class="flex justify-between items-center mb-4">
-                <h4 class="font-black text-lg">${g.name}</h4>
-                <button onclick="addSet('${g.name}')" class="text-blue-500 text-sm font-bold bg-blue-50 px-3 py-1 rounded-lg">+ Подход</button>
-            </div>
-            <div class="space-y-2">
-                ${g.sets.map((s, i) => `
-                    <div class="set-row">
-                        <span class="text-xs font-bold text-slate-400 w-4">${i+1}</span>
-                        <input type="number" value="${s.w}" onchange="updateSet(${s.idx}, 'w', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Время' : 'Вес'}">
-                        <span class="text-xs text-slate-400">${label1}</span>
-                        <span class="text-slate-300 mx-1">${isCardio ? '|' : label2}</span>
-                        <input type="number" value="${s.r}" onchange="updateSet(${s.idx}, 'r', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Уровень' : 'Повт'}">
-                        <button onclick="deleteSet(${s.idx})" class="text-slate-300 hover:text-red-500 ml-2"><i class="fa-solid fa-xmark"></i></button>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-    `}).join('');
-}
-
-function openExModal() {
-    haptic('light');
-    $('exModal').style.display = 'flex';
-    $('exSearch').value = ''; $('exWeight').value = ''; $('exReps').value = '';
-    isCardioSelected = false;
-    $('exInput1Label').innerText = 'Вес (кг)';
-    $('exInput2Label').innerText = 'Повторы';
-    filterEx();
-}
-
-function filterEx() {
-    const q = $('exSearch').value.toLowerCase();
-    const res = $('exSearchResults');
-    res.innerHTML = '';
-    EX_DB.filter(ex => ex.toLowerCase().includes(q)).forEach(ex => {
-        const div = document.createElement('div');
-        div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50';
-        div.innerText = ex;
-        div.onclick = () => { 
-            $('exSearch').value = ex; 
-            res.innerHTML = ''; 
-            isCardioSelected = CARDIO_LIST.some(c => ex.toLowerCase().includes(c));
-            $('exInput1Label').innerText = isCardioSelected ? 'Время (мин)' : 'Вес (кг)';
-            $('exInput2Label').innerText = isCardioSelected ? 'Уровень / Наклон' : 'Повторы';
-        };
-        res.appendChild(div);
-    });
-}
-
-function confirmAddEx() {
-    const name = $('exSearch').value;
-    if(!name) return alert('Введите название!');
-    const dk = iso(pivotDate);
-    const w = $('exWeight').value;
-    const r = $('exReps').value;
-    
-    const setsCount = isCardioSelected ? 1 : 3;
-    for(let i=0; i < setsCount; i++) sportData[dk].workout.push({ n: name, w: w, r: r });
-    
-    haptic('success');
-    save(); 
-    render(); 
-    closeModal('exModal');
-}
-
-function addSet(name) {
-    haptic('light');
-    const dk = iso(pivotDate);
-    const lastSet = [...sportData[dk].workout].reverse().find(w => w.n === name);
-    sportData[dk].workout.push({ n: name, w: lastSet?.w||'', r: lastSet?.r||'' });
-    save(); render();
-}
-
-function updateSet(idx, field, val) { sportData[iso(pivotDate)].workout[idx][field] = val; save(); }
-function deleteSet(idx) { haptic('medium'); sportData[iso(pivotDate)].workout.splice(idx, 1); save(); render(); }
-
-function shareWorkout() {
-    haptic('medium');
-    const dk = iso(pivotDate);
-    const day = sportData[dk];
-    if (!day || !day.workout || day.workout.length === 0) return alert('Нет тренировок для шеринга!');
-    let tonnage = 0;
-    day.workout.forEach(w => tonnage += (parseFloat(w.w)||0) * (parseFloat(w.r)||0));
-    const text = `🔥 Отличная тренировка!\nТоннаж: ${tonnage} кг\nПодходов: ${day.workout.length}`;
-    const url = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/your_bot_name/app')}&text=${encodeURIComponent(text)}`;
-    tg.openTelegramLink(url);
-}
-
-// === ШАБЛОНЫ ===
-function openSaveTplModal(type, mealType = '') {
-    haptic('light');
-    currentTplType = type; currentMealForAdd = mealType;
-    const dk = iso(pivotDate);
-    if(type === 'workout' && sportData[dk].workout.length === 0) return alert('Тренировка пуста!');
-    if(type === 'meal' && sportData[dk].food.filter(f => f.type === mealType).length === 0) return alert('Прием пищи пуст!');
-    $('tplNameInput').value = type === 'meal' ? mealType : '';
-    $('saveTplModal').style.display = 'flex';
-}
-
-function confirmSaveTemplate() {
-    const name = $('tplNameInput').value;
-    if(!name) return alert('Введите название!');
-    const dk = iso(pivotDate);
-    if(currentTplType === 'workout') {
-        sportData._templates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(sportData[dk].workout)) });
-    } else if(currentTplType === 'meal') {
-        const items = sportData[dk].food.filter(f => f.type === currentMealForAdd);
-        sportData._mealTemplates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(items)) });
-    }
-    haptic('success'); save(); closeModal('saveTplModal');
-}
-
-function openLoadTplModal(type, mealType = '') {
-    haptic('light');
-    currentTplType = type; currentMealForAdd = mealType;
-    const list = $('tplList'); list.innerHTML = '';
-    const tpls = type === 'workout' ? sportData._templates : sportData._mealTemplates;
-    
-    if(!tpls || tpls.length === 0) {
-        list.innerHTML = '<p class="text-center text-slate-400 text-sm font-bold py-4">Нет сохраненных шаблонов</p>';
-    } else {
-        tpls.forEach(t => {
-            list.innerHTML += `
-            <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-2 cursor-pointer" onclick="applyTemplate(${t.id})">
-                <div><p class="font-bold text-sm text-slate-700">${t.name}</p><p class="text-[10px] text-slate-400 font-bold">${t.items.length} элементов</p></div>
-                <button onclick="event.stopPropagation(); deleteTemplate(${t.id})" class="text-slate-300 hover:text-red-500 px-2"><i class="fa-solid fa-trash"></i></button>
-            </div>`;
-        });
-    }
-    $('loadTplModal').style.display = 'flex';
-}
-
-function applyTemplate(id) {
-    const dk = iso(pivotDate);
-    if(currentTplType === 'workout') {
-        const t = sportData._templates.find(x => x.id === id);
-        if(t) sportData[dk].workout.push(...JSON.parse(JSON.stringify(t.items)));
-    } else if(currentTplType === 'meal') {
-        const t = sportData._mealTemplates.find(x => x.id === id);
-        if(t) {
-            const newItems = JSON.parse(JSON.stringify(t.items)).map(i => ({...i, type: currentMealForAdd}));
-            sportData[dk].food.push(...newItems);
-        }
-    }
-    haptic('success'); save(); render(); closeModal('loadTplModal');
-}
-
-function deleteTemplate(id) {
-    if(confirm('Удалить шаблон?')) {
-        if(currentTplType === 'workout') sportData._templates = sportData._templates.filter(x => x.id !== id);
-        else sportData._mealTemplates = sportData._mealTemplates.filter(x => x.id !== id);
-        save(); openLoadTplModal(currentTplType, currentMealForAdd);
-    }
-}
-
-// === КАЛЬКУЛЯТОР 1RM ===
-function openRmModal() {
-    haptic('light'); $('rmModal').style.display = 'flex'; $('rmW').value = ''; $('rmR').value = ''; calcRM();
-}
-
-function calcRM() {
-    const w = parseFloat($('rmW').value) || 0, r = parseFloat($('rmR').value) || 0;
-    if (w > 0 && r > 0) {
-        const rm = Math.round(w * (1 + r / 30));
-        $('rmResult').innerText = rm + ' кг';
-        $('rm90').innerText = Math.round(rm * 0.9); $('rm80').innerText = Math.round(rm * 0.8);
-        $('rm70').innerText = Math.round(rm * 0.7); $('rm60').innerText = Math.round(rm * 0.6);
-    } else {
-        $('rmResult').innerText = '0 кг';['rm90','rm80','rm70','rm60'].forEach(id => $(id).innerText = '0');
-    }
-}
-
-// === МОДУЛЬ ПИТАНИЯ ===
-function renderNutrition(dk) {
-    const dayData = sportData[dk];
-    let tc=0, tp=0, tf=0, tu=0, tfib=0;
-    dayData.food.forEach(f => { tc+=f.c; tp+=f.p; tf+=f.f; tu+=f.u; tfib+=(f.fib||0); });
-    
-    $('calEaten').innerText = tc; $('calLeft').innerText = userGoals.c - tc;
-    $('calGoalDisplay').innerText = userGoals.c;
-    $('pVal').innerText = `${Math.round(tp)}/${userGoals.p}`; 
-    $('fVal').innerText = `${Math.round(tf)}/${userGoals.f}`; 
-    $('cVal').innerText = `${Math.round(tu)}/${userGoals.u}`;
-    $('fibVal').innerText = `${Math.round(tfib)}/${userGoals.fib}`;
-    
-    // Глобальный прогресс-бар БЖУК
-    let totalM = tp + tf + tu + tfib;
-    $('globalMacroBar').innerHTML = totalM > 0 ? `
-        <div class="bg-green-400" style="width:${(tp/totalM)*100}%"></div>
-        <div class="bg-red-400" style="width:${(tf/totalM)*100}%"></div>
-        <div class="bg-blue-400" style="width:${(tu/totalM)*100}%"></div>
-        <div class="bg-yellow-400" style="width:${(tfib/totalM)*100}%"></div>
-    ` : '';
-
-    const waterVal = dayData.water || 0;
-    $('waterVal').innerHTML = `${waterVal} <span class="text-lg opacity-50">/ ${userGoals.water}</span>`;
-    const waterPct = Math.min((waterVal / userGoals.water) * 100, 100);
-    $('waterFill').style.height = `${waterPct}%`;
-
-    const list = $('foodList');
-    list.innerHTML = dayData.activeMeals.map(meal => {
-        const items = dayData.food.filter(f => f.type === meal);
-        let mc=0, mp=0, mf=0, mu=0, mfib=0; 
-        items.forEach(i => { mc+=i.c; mp+=i.p; mf+=i.f; mu+=i.u; mfib+=(i.fib||0); });
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--tg-theme-secondary-bg-color, #f8fafc); color: var(--tg-theme-text-color, #0f172a); -webkit-tap-highlight-color: transparent; padding-bottom: 100px; }
+        .card { background-color: var(--tg-theme-bg-color, #ffffff); border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); padding: 16px; margin-bottom: 16px; position: relative; overflow: hidden; }
         
-        let mTotal = mp + mf + mu + mfib;
-        let mealBar = mTotal > 0 ? `
-            <div class="flex h-1 w-full rounded-full overflow-hidden mt-2 opacity-80">
-                <div class="bg-green-500" style="width:${(mp/mTotal)*100}%"></div>
-                <div class="bg-red-500" style="width:${(mf/mTotal)*100}%"></div>
-                <div class="bg-blue-500" style="width:${(mu/mTotal)*100}%"></div>
-                <div class="bg-yellow-500" style="width:${(mfib/mTotal)*100}%"></div>
-            </div>
-        ` : '';
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--tg-theme-bg-color, #ffffff); border-top: 1px solid rgba(0,0,0,0.05); display: flex; justify-content: space-around; padding: 10px 0; padding-bottom: calc(25px + env(safe-area-inset-bottom)); z-index: 50; }
+        .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--tg-theme-hint-color, #94a3b8); font-size: 10px; font-weight: 800; text-transform: uppercase; z-index: 10; transition: color 0.3s; background: transparent; border: none; outline: none; }
+        .nav-btn.active { color: var(--tg-theme-button-color, #3b82f6); }
+        .nav-btn i { font-size: 20px; transition: transform 0.3s; }
+        .nav-btn.active i { transform: translateY(-2px); }
+        .nav-slider-container { position: absolute; top: 5px; left: 0; width: 100%; height: 45px; z-index: 0; pointer-events: none; }
+        #nav-slider { position: absolute; top: 0; left: 0; height: 100%; width: 33.33%; display: flex; justify-content: center; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #nav-slider-bg { width: 60%; height: 100%; background: var(--tg-theme-secondary-bg-color, #eff6ff); border-radius: 16px; }
 
-        return `
-        <div class="card">
-            <div class="flex justify-between items-center mb-3">
-                <h4 class="font-black text-lg">${meal}</h4>
+        .custom-input { background: var(--tg-theme-secondary-bg-color, #f1f5f9); border-radius: 12px; padding: 12px; width: 100%; outline: none; font-weight: 700; color: inherit; border: none; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 100; display: none; align-items: flex-end; }
+        .modal-content { background: var(--tg-theme-bg-color, #ffffff); width: 100%; border-radius: 30px 30px 0 0; padding: 24px; padding-bottom: 40px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .set-row { display: flex; align-items: center; gap: 8px; background: var(--tg-theme-secondary-bg-color, #f8fafc); padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; }
+        .set-input { width: 50px; text-align: center; background: transparent; font-weight: 800; font-size: 16px; outline: none; color: var(--tg-theme-text-color, #000); border: none; }
+        
+        .water-card { overflow: hidden; z-index: 1; }
+        #waterFill { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(59, 130, 246, 0.15); z-index: -1; transition: height 0.5s ease-in-out; }
+        
+        /* Стили сканера */
+        #scanner-container { width: 100%; height: 200px; overflow: hidden; border-radius: 12px; margin-bottom: 10px; background: #000; display: none; position: relative; }
+        #scanner-container video { width: 100%; height: 100%; object-fit: cover; }
+        .scan-line { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: red; box-shadow: 0 0 10px red; animation: scan 2s infinite linear; z-index: 10; }
+        @keyframes scan { 0% { top: 10%; } 50% { top: 90%; } 100% { top: 10%; } }
+    </style>
+</head>
+<body>
+
+    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex justify-between items-center" style="background-color: var(--tg-theme-bg-color);">
+        <button onclick="changeDate(-1)" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-chevron-left"></i></button>
+        <div class="text-center flex flex-col items-center" onclick="goToday()">
+            <div class="flex items-center gap-2">
+                <h2 id="dateDisplay" class="text-lg font-black tracking-tight">Сегодня</h2>
+                <span id="syncStatus" class="text-slate-300 text-xs transition-all"><i class="fa-solid fa-cloud"></i></span>
+            </div>
+            <p id="dateSubDisplay" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Загрузка...</p>
+        </div>
+        <button onclick="changeDate(1)" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-chevron-right"></i></button>
+    </header>
+
+    <main class="p-4">
+        
+        <!-- ВЬЮ: СПОРТ -->
+        <div id="view-sport" class="space-y-4">
+            <div class="flex justify-between items-center mb-2">
                 <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-400 mr-2">${mc} ккал</span>
-                    <button onclick="openSaveTplModal('meal', '${meal}')" class="w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-floppy-disk"></i></button>
-                    <button onclick="openLoadTplModal('meal', '${meal}')" class="w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-folder-open"></i></button>
-                    <button onclick="openFoodModal('${meal}')" class="w-8 h-8 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
+                    <h3 class="text-2xl font-black">Тренировка</h3>
+                    <button onclick="openRmModal()" class="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-lg uppercase">1RM</button>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="openSaveTplModal('workout')" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full shadow-sm flex items-center justify-center"><i class="fa-solid fa-floppy-disk"></i></button>
+                    <button onclick="openLoadTplModal('workout')" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full shadow-sm flex items-center justify-center"><i class="fa-solid fa-folder-open"></i></button>
+                    <button onclick="openExModal()" class="w-10 h-10 bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
-            ${mealBar}
-            <div class="space-y-2 mt-3">
-                ${items.length === 0 ? '<p class="text-xs text-slate-300 font-bold">Пусто</p>' : items.map(f => {
-                    let fTotal = f.p + f.f + f.u + (f.fib||0);
-                    let foodBar = fTotal > 0 ? `
-                        <div class="flex h-1 w-full rounded-full overflow-hidden mt-1.5 opacity-60">
-                            <div class="bg-green-500" style="width:${(f.p/fTotal)*100}%"></div>
-                            <div class="bg-red-500" style="width:${(f.f/fTotal)*100}%"></div>
-                            <div class="bg-blue-500" style="width:${(f.u/fTotal)*100}%"></div>
-                            <div class="bg-yellow-500" style="width:${((f.fib||0)/fTotal)*100}%"></div>
-                        </div>
-                    ` : '';
-                    return `
-                    <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
-                        <div class="flex-1 mr-4">
-                            <p class="font-bold text-sm">${f.n}</p>
-                            <p class="text-[10px] text-slate-400 font-bold">${f.w}${f.n.includes('шт') ? 'шт' : 'г'} • Б:${f.p} Ж:${f.f} У:${f.u} Кл:${f.fib||0}</p>
-                            ${foodBar}
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <span class="font-black text-sm">${f.c}</span>
-                            <button onclick="deleteFood(${dayData.food.indexOf(f)})" class="text-slate-300 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
-                        </div>
+            <div id="workoutList" class="space-y-4"></div>
+        </div>
+
+        <!-- ВЬЮ: ПИТАНИЕ -->
+        <div id="view-nutrition" class="space-y-4 hidden">
+            <div class="card bg-gradient-to-br from-orange-400 to-red-500 text-white border-0">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Калории</p>
+                        <h4 class="text-4xl font-black tabular-nums"><span id="calEaten">0</span><span class="text-xl opacity-50">/<span id="calGoalDisplay">2500</span></span></h4>
                     </div>
-                `}).join('')}
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function addWater(amount) { 
-    haptic('light'); 
-    const dk = iso(pivotDate); 
-    sportData[dk].water = Math.max(0, (sportData[dk].water || 0) + amount); 
-    save(); render(); 
-}
-
-function openGoalModal() {
-    haptic('light');
-    $('goalC').value = userGoals.c; $('goalP').value = userGoals.p; $('goalF').value = userGoals.f;
-    $('goalU').value = userGoals.u; $('goalFib').value = userGoals.fib; $('goalWater').value = userGoals.water;
-    $('goalModal').style.display = 'flex';
-}
-
-function saveGoals() {
-    userGoals = {
-        c: parseInt($('goalC').value)||2500, p: parseInt($('goalP').value)||160, f: parseInt($('goalF').value)||70,
-        u: parseInt($('goalU').value)||300, fib: parseInt($('goalFib').value)||30, water: parseInt($('goalWater').value)||2000
-    };
-    localStorage.setItem('tma_user_goals', JSON.stringify(userGoals));
-    haptic('success'); render(); closeModal('goalModal');
-}
-
-function openFoodModal(meal) {
-    haptic('light'); currentMealForAdd = meal; $('foodMealType').value = meal; $('foodModal').style.display = 'flex';
-    selectedFoodBase = null; $('foodSearch').value = ''; $('customFoodName').value = ''; $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = '100';
-    calcFood(); filterFood();
-}
-
-let searchTimeout;
-function filterFood() {
-    const q = $('foodSearch').value.toLowerCase(); const res = $('foodSearchResults'); res.innerHTML = '';
-    if(!q) return;
-    
-    FOOD_DB.filter(f => f.n.toLowerCase().includes(q)).forEach(f => {
-        const div = document.createElement('div');
-        div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center';
-        div.innerHTML = `
-            <div class="flex items-center gap-3">
-                <div class="food-img-thumb flex items-center justify-center text-slate-300"><i class="fa-solid fa-utensils text-xs"></i></div>
-                <span>${f.n}</span>
-            </div>
-            <span class="text-slate-400 text-xs">${f.c} ккал</span>
-        `;
-        div.onclick = () => {
-            selectedFoodBase = f; $('customFoodName').value = f.n; 
-            const isPiece = f.n.includes('шт'); $('customFoodWeightLabel').innerText = isPiece ? 'Кол-во (шт)' : 'Вес (г)'; $('customFoodWeight').value = isPiece ? 1 : 100;
-            calcFood(); res.innerHTML = ''; 
-        };
-        res.appendChild(div);
-    });
-
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => searchFoodOnline(q), 800);
-}
-
-async function searchFoodOnline(q) {
-    const res = $('foodSearchResults');
-    try {
-        const resp = await fetch(`https://ru.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,nutriments,image_front_small_url`);
-        const data = await resp.json();
-        if(data.products && data.products.length > 0) {
-            data.products.forEach(p => {
-                if(!p.product_name) return;
-                const f = {
-                    n: p.product_name,
-                    c: Math.round(p.nutriments['energy-kcal'] || 0),
-                    p: Math.round(p.nutriments.proteins || 0),
-                    f: Math.round(p.nutriments.fat || 0),
-                    u: Math.round(p.nutriments.carbohydrates || 0),
-                    fib: Math.round(p.nutriments.fiber_100g || 0),
-                    img: p.image_front_small_url || ''
-                };
-                const div = document.createElement('div');
-                div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center text-blue-800 bg-blue-50/50';
-                
-                const imgHtml = f.img ? `<img src="${f.img}" class="food-img-thumb">` : `<div class="food-img-thumb flex items-center justify-center text-blue-300"><i class="fa-solid fa-globe text-xs"></i></div>`;
-                
-                div.innerHTML = `
-                    <div class="flex items-center gap-3">
-                        ${imgHtml}
-                        <span>${f.n}</span>
+                    <div class="text-right flex flex-col items-end">
+                        <button onclick="openGoalModal()" class="mb-1 text-white/70 hover:text-white"><i class="fa-solid fa-gear"></i></button>
+                        <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Осталось</p>
+                        <h4 class="text-2xl font-black tabular-nums" id="calLeft">2500</h4>
                     </div>
-                    <span class="text-blue-400 text-xs">${f.c} ккал</span>
-                `;
-                div.onclick = () => {
-                    selectedFoodBase = f; $('customFoodName').value = f.n; 
-                    $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = 100;
-                    calcFood(); res.innerHTML = ''; 
-                };
-                res.appendChild(div);
-            });
-        }
-    } catch(e) { console.log('API Search Error', e); }
-}
+                </div>
+                <div class="flex gap-2 text-center">
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-green-200">Белки</p><p class="font-black text-sm" id="pVal">0/160</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-red-200">Жиры</p><p class="font-black text-sm" id="fVal">0/70</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-blue-200">Углеводы</p><p class="font-black text-sm" id="cVal">0/300</p></div>
+                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-yellow-200">Клетчатка</p><p class="font-black text-sm" id="fibVal">0/30</p></div>
+                </div>
+                <div id="globalMacroBar" class="flex h-1.5 w-full rounded-full overflow-hidden mt-3 opacity-80"></div>
+            </div>
 
-function onWeightChange() { calcFood(); }
-function onMacroChange() { selectedFoodBase = null; calcFood(); }
+            <div class="card water-card border-0 flex justify-between items-center" style="background-color: var(--tg-theme-secondary-bg-color);">
+                <div id="waterFill" style="height: 0%;"></div>
+                <div class="relative z-10">
+                    <p class="text-[10px] font-black text-sky-600/70 uppercase tracking-widest">Вода (мл)</p>
+                    <h4 class="text-3xl font-black text-sky-600 tabular-nums" id="waterVal">0 <span class="text-lg opacity-50">/ 2000</span></h4>
+                </div>
+                <div class="flex gap-2 relative z-10">
+                    <button onclick="addWater(-250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">-250</button>
+                    <button onclick="addWater(250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">+250</button>
+                </div>
+            </div>
 
-function calcFood() {
-    const w = parseFloat($('customFoodWeight').value) || 0;
-    if (selectedFoodBase) {
-        const multiplier = selectedFoodBase.n.includes('шт') ? w : w / 100;
-        $('customFoodP').value = Math.round(selectedFoodBase.p * multiplier);
-        $('customFoodF').value = Math.round(selectedFoodBase.f * multiplier);
-        $('customFoodU').value = Math.round(selectedFoodBase.u * multiplier);
-        $('customFoodFib').value = Math.round((selectedFoodBase.fib || 0) * multiplier);
-        $('customFoodC').value = Math.round(selectedFoodBase.c * multiplier);
-    } else {
-        const p = parseFloat($('customFoodP').value)||0, f = parseFloat($('customFoodF').value)||0, u = parseFloat($('customFoodU').value)||0;
-        $('customFoodC').value = Math.round((p*4 + f*9 + u*4));
-    }
-}
+            <div class="flex justify-between items-center mt-6 mb-2">
+                <h3 class="text-2xl font-black">Рацион</h3>
+            </div>
+            <div id="foodList" class="space-y-4"></div>
+        </div>
 
-function confirmAddFood() {
-    const name = $('customFoodName').value;
-    if(!name) return alert('Введите название!');
-    const dk = iso(pivotDate);
-    sportData[dk].food.push({ 
-        type: currentMealForAdd, n: name,
-        w: parseFloat($('customFoodWeight').value)||100, p: parseFloat($('customFoodP').value)||0,
-        f: parseFloat($('customFoodF').value)||0, u: parseFloat($('customFoodU').value)||0, 
-        fib: parseFloat($('customFoodFib').value)||0, c: parseInt($('customFoodC').value)||0 
-    });
-    haptic('success'); save(); render(); closeModal('foodModal');
-}
+        <!-- ВЬЮ: АНАЛИТИКА -->
+        <div id="view-analytics" class="space-y-4 hidden">
+            <h3 class="text-2xl font-black mb-4">Аналитика</h3>
+            
+            <div class="card">
+                <div class="flex justify-between items-center cursor-pointer" onclick="toggleCalendar()">
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-black text-sm">Календарь</h4>
+                        <span id="calCurrentDateBadge" class="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md"></span>
+                    </div>
+                    <i id="calToggleIcon" class="fa-solid fa-chevron-down text-slate-400 transition-transform"></i>
+                </div>
+                <div id="calendarWrapper" class="transition-all duration-300 overflow-hidden" style="max-height: 0px;">
+                    <div class="flex justify-between items-center mb-4 mt-4">
+                        <button onclick="changeCalMonth(-1)" class="w-6 h-6 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-left text-[10px]"></i></button>
+                        <span id="calMonthLabel" class="text-xs font-bold text-slate-700 w-24 text-center"></span>
+                        <button onclick="changeCalMonth(1)" class="w-6 h-6 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-right text-[10px]"></i></button>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2">
+                        <div>ПН</div><div>ВТ</div><div>СР</div><div>ЧТ</div><div>ПТ</div><div>СБ</div><div>ВС</div>
+                    </div>
+                    <div id="analyticsCalendar" class="grid grid-cols-7 gap-1 text-center"></div>
+                </div>
+            </div>
 
-function deleteFood(idx) { haptic('medium'); sportData[iso(pivotDate)].food.splice(idx, 1); save(); render(); }
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тренировок (7 дн)</p><h4 id="statTotalWo" class="text-3xl font-black text-blue-500 tabular-nums">0</h4></div>
+                <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тоннаж (7 дн)</p><h4 id="statTonnage" class="text-3xl font-black text-green-500 tabular-nums">0<span class="text-sm">т</span></h4></div>
+            </div>
+            
+            <div class="card">
+                <h4 class="font-black text-sm mb-4">Макронутриенты (7 дней)</h4>
+                <div class="h-48 relative w-full"><canvas id="chartCals"></canvas></div>
+            </div>
+            
+            <div class="card">
+                <h4 class="font-black text-sm mb-4">БЖУК (Среднее за 7 дней)</h4>
+                <div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div>
+            </div>
 
-// --- СКАНЕР ШТРИХ-КОДОВ (QUAGGA) ---
-let isScanning = false;
-function scanBarcode() {
-    haptic('heavy');
-    const container = $('scanner-container');
-    
-    if (isScanning) {
-        Quagga.stop(); isScanning = false; container.style.display = 'none'; return;
-    }
-    
-    container.style.display = 'block';
-    isScanning = true;
-    
-    Quagga.init({
-        inputStream: { name: "Live", type: "LiveStream", target: container },
-        decoder: { readers: ["ean_reader", "ean_8_reader"] }
-    }, function(err) {
-        if (err) { alert('Ошибка камеры'); container.style.display = 'none'; isScanning = false; return; }
-        Quagga.start();
-    });
-    
-    Quagga.onDetected(function(result) {
-        const code = result.codeResult.code;
-        Quagga.stop(); isScanning = false; container.style.display = 'none';
-        fetchProductByCode(code);
-    });
-}
+            <div class="card">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-black text-sm">Прогресс упражнений</h4>
+                </div>
+                <select id="analyticsExSelect" onchange="renderExProgressChart()" class="custom-input mb-4 text-xs py-2">
+                    <option value="">Выберите упражнение...</option>
+                </select>
+                <div class="h-40 relative w-full"><canvas id="chartExProgress"></canvas></div>
+            </div>
+        </div>
 
-async function fetchProductByCode(code) {
-    $('foodSearch').value = 'Ищем в базе...';
-    try {
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
-        const data = await res.json();
-        if(data.status === 1) {
-            const p = data.product;
-            selectedFoodBase = {
-                n: p.product_name || 'Неизвестно',
-                p: Math.round(p.nutriments.proteins_100g || 0),
-                f: Math.round(p.nutriments.fat_100g || 0),
-                u: Math.round(p.nutriments.carbohydrates_100g || 0),
-                fib: Math.round(p.nutriments.fiber_100g || 0),
-                c: Math.round(p.nutriments['energy-kcal'] || 0)
-            };
-            $('customFoodName').value = selectedFoodBase.n;
-            $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = '100';
-            calcFood(); $('foodSearch').value = ''; haptic('success');
-        } else { 
-            alert('Продукт не найден в базе OpenFoodFacts.'); 
-            $('foodSearch').value = code; haptic('error'); 
-        }
-    } catch(e) { alert('Ошибка сети при поиске штрих-кода.'); $('foodSearch').value = ''; }
-}
+    </main>
 
-// === МОДУЛЬ АНАЛИТИКИ И КАЛЕНДАРЯ ===
-function renderAnalytics() {
-    const dates =[], cals = [], p=[], f=[], u=[], fib=[];
-    let totalWo = 0, totalTon = 0;
-    
-    const now = new Date();
-    for(let i=6; i>=0; i--) {
-        const d = new Date(now); d.setDate(now.getDate() - i);
-        const dk = iso(d);
-        dates.push(d.toLocaleDateString('ru-RU', {weekday:'short'}));
-        
-        const day = sportData[dk] || { food:[], workout:[] };
-        
-        let dc=0, dp=0, df=0, du=0, dfib=0;
-        day.food.forEach(item => { dc+=item.c; dp+=item.p; df+=item.f; du+=item.u; dfib+=(item.fib||0); });
-        cals.push(dc); p.push(dp); f.push(df); u.push(du); fib.push(dfib);
-        
-        if(day.workout.length > 0) {
-            totalWo++;
-            day.workout.forEach(w => { totalTon += (parseFloat(w.w)||0) * (parseFloat(w.r)||0); });
-        }
-    }
-    
-    $('statTotalWo').innerText = totalWo;
-    $('statTonnage').innerHTML = (totalTon / 1000).toFixed(1) + '<span class="text-sm">т</span>';
-    
-    // ПУНКТ 5: График БЖУК за 7 дней (Группированный)
-    drawChart('chartCals', 'bar', { 
-        labels: dates, 
-        datasets:[
-            { label: 'Белки', data: p, backgroundColor: '#22c55e', borderRadius: 2 },
-            { label: 'Жиры', data: f, backgroundColor: '#ef4444', borderRadius: 2 },
-            { label: 'Углеводы', data: u, backgroundColor: '#3b82f6', borderRadius: 2 },
-            { label: 'Клетчатка', data: fib, backgroundColor: '#eab308', borderRadius: 2 }
-        ] 
-    }, { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { display: false } } } });
-    
-    const avgP = p.reduce((a,b)=>a+b,0)/7, avgF = f.reduce((a,b)=>a+b,0)/7, avgU = u.reduce((a,b)=>a+b,0)/7;
-    drawChart('chartMacros', 'doughnut', {
-        labels:['Белки', 'Жиры', 'Углеводы'],
-        datasets:[{ data:[avgP, avgF, avgU], backgroundColor:['#22c55e', '#ef4444', '#3b82f6'], borderWidth: 0 }]
-    }, { cutout: '70%', plugins: { legend: { position: 'right' } } });
+    <!-- НИЖНЯЯ ПАНЕЛЬ НАВИГАЦИИ -->
+    <nav class="bottom-nav">
+        <div class="nav-slider-container">
+            <div id="nav-slider"><div id="nav-slider-bg"></div></div>
+        </div>
+        <button onclick="switchTab('sport', 0)" id="tab-sport" class="nav-btn active"><i class="fa-solid fa-dumbbell"></i><span>Спорт</span></button>
+        <button onclick="switchTab('nutrition', 1)" id="tab-nutrition" class="nav-btn"><i class="fa-solid fa-utensils"></i><span>Питание</span></button>
+        <button onclick="switchTab('analytics', 2)" id="tab-analytics" class="nav-btn"><i class="fa-solid fa-chart-pie"></i><span>Аналитика</span></button>
+    </nav>
 
-    renderCalendar();
-    populateExSelect();
-}
+    <!-- МОДАЛКИ (ОСТАЛЬНЫЕ) -->
+    <div id="dayModal" class="modal-overlay" onclick="if(event.target===this) closeModal('dayModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="dayModalTitle" class="text-xl font-black">Детали дня</h3>
+                <button onclick="closeModal('dayModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="dayModalContent" class="space-y-4"></div>
+        </div>
+    </div>
 
-function toggleCalendar() {
-    const wrap = $('calendarWrapper');
-    const icon = $('calToggleIcon');
-    if(wrap.style.maxHeight === '0px' || wrap.style.maxHeight === '') {
-        wrap.style.maxHeight = '300px';
-        icon.style.transform = 'rotate(0deg)';
-    } else {
-        wrap.style.maxHeight = '0px';
-        icon.style.transform = 'rotate(180deg)';
-    }
-}
+    <div id="rmModal" class="modal-overlay" onclick="if(event.target===this) closeModal('rmModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">1RM Калькулятор</h3>
+                <button onclick="closeModal('rmModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вес (кг)</p><input type="number" id="rmW" class="custom-input text-center" oninput="calcRM()" placeholder="100"></div>
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Повторы</p><input type="number" id="rmR" class="custom-input text-center" oninput="calcRM()" placeholder="8"></div>
+            </div>
+            <div class="bg-blue-50 p-6 rounded-2xl text-center mb-4">
+                <p class="text-[10px] font-bold text-blue-400 uppercase mb-1">Ваш максимум (1RM)</p>
+                <h4 id="rmResult" class="text-5xl font-black text-blue-600 tabular-nums">0 кг</h4>
+            </div>
+            <div id="rmPercentages" class="grid grid-cols-4 gap-2 text-center text-[10px] font-bold text-slate-500 mb-4">
+                <div class="bg-slate-50 p-2 rounded-lg">90%<br><span id="rm90" class="text-slate-800 text-xs">0</span></div>
+                <div class="bg-slate-50 p-2 rounded-lg">80%<br><span id="rm80" class="text-slate-800 text-xs">0</span></div>
+                <div class="bg-slate-50 p-2 rounded-lg">70%<br><span id="rm70" class="text-slate-800 text-xs">0</span></div>
+                <div class="bg-slate-50 p-2 rounded-lg">60%<br><span id="rm60" class="text-slate-800 text-xs">0</span></div>
+            </div>
+        </div>
+    </div>
 
-function changeCalMonth(delta) { haptic('light'); calPivot.setMonth(calPivot.getMonth() + delta); renderCalendar(); }
+    <div id="exModal" class="modal-overlay" onclick="if(event.target===this) closeModal('exModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Упражнение</h3>
+                <button onclick="closeModal('exModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="exSearch" placeholder="Поиск упражнения..." class="custom-input mb-2" oninput="filterEx()">
+            <div id="exSearchResults" class="max-h-40 overflow-y-auto mb-4 space-y-1"></div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div><p id="exInput1Label" class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вес (кг)</p><input type="number" id="exWeight" class="custom-input text-center" placeholder="0"></div>
+                <div><p id="exInput2Label" class="text-[10px] font-bold text-slate-400 uppercase mb-1">Повторы</p><input type="number" id="exReps" class="custom-input text-center" placeholder="0"></div>
+            </div>
+            <button onclick="confirmAddEx()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Добавить упражнение</button>
+        </div>
+    </div>
 
-function renderCalendar() {
-    const grid = $('analyticsCalendar');
-    if(!grid) return;
-    grid.innerHTML = '';
-    
-    const year = calPivot.getFullYear();
-    const month = calPivot.getMonth();
-    $('calMonthLabel').innerText = calPivot.toLocaleDateString('ru-RU', {month: 'long', year: 'numeric'});
-    $('calCurrentDateBadge').innerText = new Date().toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'});
-    
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    let startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
-    
-    for(let i=0; i<startDay; i++) grid.innerHTML += `<div></div>`;
-    
-    for(let i=1; i<=lastDay.getDate(); i++) {
-        const d = new Date(year, month, i);
-        const dk = iso(d);
-        const dayData = sportData[dk];
-        const hasWorkout = dayData && dayData.workout && dayData.workout.length > 0;
-        const isToday = dk === iso(new Date());
-        
-        let bgClass = 'bg-slate-50 text-slate-600';
-        if(hasWorkout) bgClass = 'bg-blue-100 text-blue-600 font-black border border-blue-200';
-        if(isToday) bgClass += ' ring-2 ring-orange-400';
-        
-        grid.innerHTML += `<div onclick="openDayDetails('${dk}')" class="h-10 rounded-xl flex items-center justify-center text-xs cursor-pointer ${bgClass}">${i}</div>`;
-    }
-}
+    <div id="foodModal" class="modal-overlay" onclick="if(event.target===this) closeModal('foodModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Добавить продукт</h3>
+                <button onclick="closeModal('foodModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="hidden" id="foodMealType">
+            
+            <div class="flex gap-2 mb-2">
+                <input type="text" id="foodSearch" placeholder="Поиск продукта..." class="custom-input flex-1" oninput="filterFood()">
+                <button onclick="scanBarcode()" class="w-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg"><i class="fa-solid fa-barcode"></i></button>
+            </div>
+            
+            <div id="scanner-container">
+                <video autoplay muted playsinline></video>
+                <div class="scan-line"></div>
+            </div>
+            
+            <div id="foodSearchResults" class="max-h-40 overflow-y-auto mb-4 space-y-1"></div>
+            
+            <input type="text" id="customFoodName" placeholder="Название" class="custom-input mb-4">
+            
+            <div class="flex justify-between items-center mb-2">
+                <p id="customFoodWeightLabel" class="text-[10px] font-bold text-slate-400 uppercase">Вес (г)</p>
+                <input type="number" id="customFoodWeight" value="100" class="w-24 p-2 bg-slate-100 rounded-lg text-center font-bold outline-none" oninput="onWeightChange()">
+            </div>
+            
+            <div class="grid grid-cols-5 gap-2 mb-6">
+                <div class="text-center"><p class="text-[9px] font-bold text-slate-400">Ккал</p><input type="number" id="customFoodC" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" readonly></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-green-500">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-red-500">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-blue-500">У</p><input type="number" id="customFoodU" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-yellow-500">Кл</p><input type="number" id="customFoodFib" value="0" class="w-full p-2 bg-slate-100 rounded-lg text-center font-bold outline-none text-xs" oninput="onMacroChange()"></div>
+            </div>
+            <button onclick="confirmAddFood()" class="w-full bg-orange-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-orange-500/30">Сохранить продукт</button>
+        </div>
+    </div>
 
-function openDayDetails(dk) {
-    haptic('light');
-    const dayData = sportData[dk];
-    const content = $('dayModalContent');
-    $('dayModalTitle').innerText = new Date(dk).toLocaleDateString('ru-RU', {day:'numeric', month:'long'});
-    
-    if(!dayData || (!dayData.workout.length && !dayData.food.length)) {
-        content.innerHTML = '<p class="text-center text-slate-400 text-sm py-4">Нет данных за этот день</p>';
-    } else {
-        let html = '';
-        if(dayData.workout.length > 0) {
-            let ton = 0;
-            dayData.workout.forEach(w => ton += (parseFloat(w.w)||0)*(parseFloat(w.r)||0));
-            html += `<h4 class="font-black text-sm mb-2 text-blue-500"><i class="fa-solid fa-dumbbell"></i> Тренировка (${ton} кг)</h4>`;
-            dayData.workout.forEach(w => {
-                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-2 rounded-lg mb-1 flex justify-between"><span>${w.n}</span><span>${w.w} × ${w.r}</span></div>`;
-            });
-        }
-        if(dayData.food.length > 0) {
-            let cal = 0;
-            dayData.food.forEach(f => cal += f.c);
-            html += `<h4 class="font-black text-sm mt-4 mb-2 text-orange-500"><i class="fa-solid fa-utensils"></i> Питание (${cal} ккал)</h4>`;
-            dayData.food.forEach(f => {
-                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-2 rounded-lg mb-1 flex justify-between"><span>${f.n}</span><span>${f.c} ккал</span></div>`;
-            });
-        }
-        content.innerHTML = html;
-    }
-    $('dayModal').style.display = 'flex';
-}
+    <div id="goalModal" class="modal-overlay" onclick="if(event.target===this) closeModal('goalModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Цели на день</h3>
+                <button onclick="closeModal('goalModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Калории</p><input type="number" id="goalC" class="custom-input text-center"></div>
+                <div><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вода (мл)</p><input type="number" id="goalWater" class="custom-input text-center"></div>
+            </div>
+            <div class="grid grid-cols-4 gap-2 mb-6">
+                <div class="text-center"><p class="text-[10px] font-bold text-green-500 uppercase mb-1">Белки</p><input type="number" id="goalP" class="custom-input text-center px-1"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-red-500 uppercase mb-1">Жиры</p><input type="number" id="goalF" class="custom-input text-center px-1"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-blue-500 uppercase mb-1">Угли</p><input type="number" id="goalU" class="custom-input text-center px-1"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-yellow-500 uppercase mb-1">Клетч</p><input type="number" id="goalFib" class="custom-input text-center px-1"></div>
+            </div>
+            <button onclick="saveGoals()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Сохранить цели</button>
+        </div>
+    </div>
 
-function populateExSelect() {
-    const select = $('analyticsExSelect');
-    if(!select) return;
-    const exSet = new Set();
-    Object.values(sportData).forEach(d => d.workout?.forEach(w => exSet.add(w.n)));
-    
-    select.innerHTML = '<option value="">Выберите упражнение...</option>';
-    Array.from(exSet).sort().forEach(ex => {
-        select.innerHTML += `<option value="${ex}">${ex}</option>`;
-    });
-}
+    <div id="saveTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('saveTplModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Сохранить как шаблон</h3>
+                <button onclick="closeModal('saveTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="tplNameInput" placeholder="Название шаблона (напр. День Ног)" class="custom-input mb-6">
+            <button onclick="confirmSaveTemplate()" class="w-full bg-slate-900 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg">Сохранить</button>
+        </div>
+    </div>
 
-function renderExProgressChart() {
-    const exName = $('analyticsExSelect').value;
-    if(!exName) {
-        if(charts['chartExProgress']) charts['chartExProgress'].destroy();
-        return;
-    }
-    
-    const dates = [];
-    const maxWeights =[];
-    
-    const now = new Date();
-    for(let i=29; i>=0; i--) {
-        const d = new Date(now); d.setDate(now.getDate() - i);
-        const dk = iso(d);
-        const dayData = sportData[dk];
-        
-        if(dayData && dayData.workout) {
-            const sets = dayData.workout.filter(w => w.n === exName);
-            if(sets.length > 0) {
-                dates.push(d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}));
-                let maxW = 0;
-                sets.forEach(s => { if(parseFloat(s.w) > maxW) maxW = parseFloat(s.w); });
-                maxWeights.push(maxW);
-            }
-        }
-    }
-    
-    drawChart('chartExProgress', 'line', {
-        labels: dates,
-        datasets:[{ label: 'Макс. вес (кг)', data: maxWeights, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }]
-    });
-}
+    <div id="loadTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('loadTplModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Мои шаблоны</h3>
+                <button onclick="closeModal('loadTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="tplList" class="space-y-2 max-h-60 overflow-y-auto"></div>
+        </div>
+    </div>
 
-function drawChart(id, type, data, opts={}) {
-    if(charts[id]) charts[id].destroy();
-    const ctx = document.getElementById(id);
-    if(!ctx) return;
-    Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
-    Chart.defaults.color = "var(--tg-theme-hint-color, #94a3b8)";
-    charts[id] = new Chart(ctx, { type: type, data: data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: type==='doughnut' } }, scales: type==='doughnut' ? {} : { x: { grid: { display: false } } }, ...opts } });
-}
-
-// Запуск
-initData();
+    <script src="app.js"></script>
+</body>
+</html>
