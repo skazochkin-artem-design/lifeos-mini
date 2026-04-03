@@ -1,19 +1,29 @@
-// Инициализация Telegram
+// --- ИНИЦИАЛИЗАЦИЯ TELEGRAM ---
 const tg = window.Telegram.WebApp;
 tg.expand();
 tg.ready();
 
+// --- НАСТРОЙКИ SUPABASE ---
+const SUPABASE_URL = 'https://hvoznktittcvsqtepopp.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mw_ldS2k_bWXSWd4ikNQCA_rCZ6OQYs'; // Вставь сюда скопированный Publishable key (sb_publishable_...)
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Настройка нативной кнопки Telegram
+tg.MainButton.textColor = "#ffffff";
+tg.MainButton.color = "#3b82f6";
+
 // Утилиты
 const $ = id => document.getElementById(id);
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function haptic(style = 'light') { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style); }
 
 // --- БАЗЫ ДАННЫХ ---
 const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Подъем на бицепс (штанга)","Молотки","Концентрированный подъем","Французский жим","Разгибания на блоке","Планка","Скручивания","Подъем ног в висе","Русский твист","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи"].sort();
 
 const FOOD_DB =[
     {n:"Гречка (сухая)", c:330, p:12, f:3, u:72},
-    {n:"Овсянка (геркулес)", c:360, p:12, f:6, u:60},
-    {n:"Рис белый (сухой)", c:360, p:7, f:1, u:79},
+    {n:"Овсянка", c:360, p:12, f:6, u:60},
+    {n:"Рис белый", c:360, p:7, f:1, u:79},
     {n:"Макароны тв. сортов", c:350, p:12, f:1, u:70},
     {n:"Куриная грудка (сырая)", c:113, p:23, f:2, u:0},
     {n:"Говядина постная", c:180, p:20, f:10, u:0},
@@ -31,15 +41,76 @@ const FOOD_DB =[
 let pivotDate = new Date();
 let currentTab = 'sport';
 let userGoals = { c: 2500, p: 160, f: 70, u: 300, water: 2000 };
-let sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {};
+let sportData = {};
 let charts = {};
+let currentMainButtonCallback = null;
 
-function save() {
-    localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
+// --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE ---
+async function initData() {
+    // 1. Сначала загружаем данные локально (чтобы приложение открылось моментально)
+    try {
+        sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {};
+    } catch(e) {
+        sportData = {};
+    }
+    render();
+
+    // 2. Затем тихо тянем свежие данные из Supabase
+    const userId = tg.initDataUnsafe?.user?.id || 123456789; // Берем ID пользователя из ТГ
+    
+    try {
+        let { data, error } = await supabase
+            .from('user_data')
+            .select('data')
+            .eq('telegram_id', userId)
+            .single();
+            
+        if (data && data.data) {
+            sportData = data.data; // Обновляем базу
+            localStorage.setItem('tma_sport_data', JSON.stringify(sportData)); // Синхронизируем локальный кэш
+            render(); // Перерисовываем интерфейс
+        }
+    } catch (err) {
+        console.error('Ошибка загрузки из Supabase:', err);
+    }
+}
+
+async function save() {
+    // 1. Мгновенно сохраняем локально
+    const dataStr = JSON.stringify(sportData);
+    localStorage.setItem('tma_sport_data', dataStr);
+    
+    // 2. Отправляем в облако Supabase
+    const userId = tg.initDataUnsafe?.user?.id || 123456789;
+    try {
+        await supabase
+            .from('user_data')
+            .upsert({ telegram_id: userId, data: sportData, updated_at: new Date() });
+    } catch (err) {
+        console.error('Ошибка сохранения в Supabase:', err);
+    }
+}
+
+// --- УПРАВЛЕНИЕ MAIN BUTTON ---
+function setupMainButton(text, callback) {
+    if (currentMainButtonCallback) {
+        tg.MainButton.offClick(currentMainButtonCallback);
+    }
+    currentMainButtonCallback = callback;
+    tg.MainButton.setText(text).show().onClick(currentMainButtonCallback);
+}
+
+function hideMainButton() {
+    tg.MainButton.hide();
+    if (currentMainButtonCallback) {
+        tg.MainButton.offClick(currentMainButtonCallback);
+        currentMainButtonCallback = null;
+    }
 }
 
 // --- НАВИГАЦИЯ И ДАТА ---
 function switchTab(tab) {
+    haptic('light');
     currentTab = tab;
     ['sport', 'nutrition', 'analytics'].forEach(t => {
         const btn = $(`tab-${t}`);
@@ -51,17 +122,20 @@ function switchTab(tab) {
 }
 
 function changeDate(delta) {
+    haptic('light');
     pivotDate.setDate(pivotDate.getDate() + delta);
     render();
 }
 
 function goToday() {
+    haptic('light');
     pivotDate = new Date();
     render();
 }
 
 function closeModal(id) { 
     $(id).style.display = 'none'; 
+    hideMainButton();
 }
 
 // --- ГЛАВНЫЙ РЕНДЕР ---
@@ -72,7 +146,7 @@ function render() {
     $('dateSubDisplay').innerText = pivotDate.toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'});
 
     if(!sportData[dk]) {
-        sportData[dk] = { workout: [], food:[], water: 0, activeMeals: ['Завтрак', 'Обед', 'Ужин', 'Перекус'] };
+        sportData[dk] = { workout: [], food:[], water: 0, activeMeals:['Завтрак', 'Обед', 'Ужин', 'Перекус'] };
     }
 
     if (currentTab === 'sport') renderSport(dk);
@@ -120,9 +194,11 @@ function renderSport(dk) {
 }
 
 function openExModal() {
+    haptic('light');
     $('exModal').style.display = 'flex';
     $('exSearch').value = ''; $('exWeight').value = ''; $('exReps').value = '';
     filterEx();
+    setupMainButton('ДОБАВИТЬ УПРАЖНЕНИЕ', confirmAddEx);
 }
 
 function filterEx() {
@@ -140,16 +216,18 @@ function filterEx() {
 
 function confirmAddEx() {
     const name = $('exSearch').value;
-    if(!name) return;
+    if(!name) return tg.showAlert('Введите название!');
     const dk = iso(pivotDate);
     const w = $('exWeight').value;
     const r = $('exReps').value;
     
     for(let i=0; i<3; i++) sportData[dk].workout.push({ n: name, w: w, r: r });
+    haptic('success');
     save(); render(); closeModal('exModal');
 }
 
 function addSet(name) {
+    haptic('light');
     const dk = iso(pivotDate);
     const lastSet = [...sportData[dk].workout].reverse().find(w => w.n === name);
     sportData[dk].workout.push({ n: name, w: lastSet?.w||'', r: lastSet?.r||'' });
@@ -162,12 +240,29 @@ function updateSet(idx, field, val) {
 }
 
 function deleteSet(idx) {
+    haptic('medium');
     sportData[iso(pivotDate)].workout.splice(idx, 1);
     save(); render();
 }
 
+// Поделиться тренировкой в Telegram
+function shareWorkout() {
+    haptic('medium');
+    const dk = iso(pivotDate);
+    const day = sportData[dk];
+    if (!day || !day.workout || day.workout.length === 0) return tg.showAlert('Нет тренировок для шеринга!');
+    
+    let tonnage = 0;
+    day.workout.forEach(w => tonnage += (parseFloat(w.w)||0) * (parseFloat(w.r)||0));
+    
+    const text = `🔥 Отличная тренировка!\nТоннаж: ${tonnage} кг\nПодходов: ${day.workout.length}`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/your_bot_name/app')}&text=${encodeURIComponent(text)}`;
+    tg.openTelegramLink(url);
+}
+
 // === КАЛЬКУЛЯТОР 1RM ===
 function openRmModal() {
+    haptic('light');
     $('rmModal').style.display = 'flex';
     $('rmW').value = ''; $('rmR').value = '';
     calcRM();
@@ -233,6 +328,7 @@ function renderNutrition(dk) {
 }
 
 function addWater(amount) {
+    haptic('light');
     const dk = iso(pivotDate);
     sportData[dk].water = (sportData[dk].water || 0) + amount;
     save(); render();
@@ -240,11 +336,13 @@ function addWater(amount) {
 
 let currentMealForAdd = '';
 function openFoodModal(meal) {
+    haptic('light');
     currentMealForAdd = meal;
     $('foodMealType').value = meal;
     $('foodModal').style.display = 'flex';
     $('foodSearch').value = ''; $('customFoodName').value = ''; $('customFoodWeight').value = '100';
     calcFood(); filterFood();
+    setupMainButton('СОХРАНИТЬ ПРОДУКТ', confirmAddFood);
 }
 
 function filterFood() {
@@ -271,17 +369,56 @@ function calcFood() {
 
 function confirmAddFood() {
     const name = $('customFoodName').value;
-    if(!name) return;
+    if(!name) return tg.showAlert('Введите название!');
     const dk = iso(pivotDate);
     sportData[dk].food.push({
         type: currentMealForAdd, n: name,
         w: parseFloat($('customFoodWeight').value)||100, p: parseFloat($('customFoodP').value)||0,
         f: parseFloat($('customFoodF').value)||0, u: parseFloat($('customFoodU').value)||0, c: parseInt($('customFoodC').value)||0
     });
+    haptic('success');
     save(); render(); closeModal('foodModal');
 }
 
-function deleteFood(idx) { sportData[iso(pivotDate)].food.splice(idx, 1); save(); render(); }
+function deleteFood(idx) { haptic('medium'); sportData[iso(pivotDate)].food.splice(idx, 1); save(); render(); }
+
+// Нативный сканер штрих-кодов Telegram
+function scanBarcode() {
+    haptic('heavy');
+    if(tg.showScanQrPopup) {
+        tg.showScanQrPopup({ text: 'Наведите на штрих-код продукта' }, function(text) {
+            fetchProductByCode(text);
+            return true; // Закрывает сканер
+        });
+    } else {
+        alert('Сканер доступен только с телефона в Telegram');
+    }
+}
+
+async function fetchProductByCode(code) {
+    $('foodSearch').value = 'Ищем...';
+    try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+        const data = await res.json();
+        if(data.status === 1) {
+            const p = data.product;
+            $('customFoodName').value = p.product_name || 'Неизвестно';
+            $('customFoodP').value = Math.round(p.nutriments.proteins_100g || 0);
+            $('customFoodF').value = Math.round(p.nutriments.fat_100g || 0);
+            $('customFoodU').value = Math.round(p.nutriments.carbohydrates_100g || 0);
+            calcFood();
+            $('foodSearch').value = '';
+            haptic('success');
+        } else {
+            tg.showAlert('❌ Продукт не найден в базе');
+            $('foodSearch').value = '';
+            haptic('error');
+        }
+    } catch(e) {
+        tg.showAlert('❌ Ошибка сети');
+        $('foodSearch').value = '';
+    }
+}
 
 // === МОДУЛЬ АНАЛИТИКИ ===
 function renderAnalytics() {
@@ -323,8 +460,9 @@ function drawChart(id, type, data, opts={}) {
     const ctx = document.getElementById(id);
     if(!ctx) return;
     Chart.defaults.font.family = "'Plus Jakarta Sans', sans-serif";
+    Chart.defaults.color = "var(--tg-theme-hint-color, #94a3b8)";
     charts[id] = new Chart(ctx, { type: type, data: data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: type==='doughnut' } }, scales: type==='doughnut' ? {} : { x: { grid: { display: false } } }, ...opts } });
 }
 
-// Запуск
-render();
+// Запуск (через Supabase или LocalStorage)
+initData();
