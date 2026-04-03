@@ -34,41 +34,44 @@ const EX_DB =[
 
 const CARDIO_LIST =['бег', 'эллипс', 'велотренажер', 'гребля', 'скакалка', 'берпи', 'ходьба', 'степпер'];
 
+// Добавлена клетчатка (fib)
 const FOOD_DB =[
-    {n:"Гречка (сухая)", c:330, p:12, f:3, u:72},
-    {n:"Овсянка", c:360, p:12, f:6, u:60},
-    {n:"Рис белый", c:360, p:7, f:1, u:79},
-    {n:"Макароны тв. сортов", c:350, p:12, f:1, u:70},
-    {n:"Куриная грудка (сырая)", c:113, p:23, f:2, u:0},
-    {n:"Говядина постная", c:180, p:20, f:10, u:0},
-    {n:"Индейка филе", c:115, p:24, f:1, u:0},
-    {n:"Лосось (свежий)", c:208, p:20, f:13, u:0},
-    {n:"Тунец консервированный", c:116, p:26, f:1, u:0},
-    {n:"Яйцо (1шт)", c:70, p:6, f:5, u:0}, 
-    {n:"Творог 5%", c:121, p:17, f:5, u:2},
-    {n:"Творог 9%", c:159, p:16, f:9, u:2},
-    {n:"Кефир 1%", c:40, p:3, f:1, u:4},
-    {n:"Сыр твердый (Пармезан)", c:431, p:38, f:29, u:4},
-    {n:"Сыр полутвердый (Российский)", c:360, p:24, f:29, u:0},
-    {n:"Банан (1шт)", c:105, p:1, f:0, u:27},
-    {n:"Яблоко (1шт)", c:95, p:0, f:0, u:25},
-    {n:"Огурец", c:15, p:1, f:0, u:3},
-    {n:"Помидор", c:20, p:1, f:0, u:4},
-    {n:"Масло оливковое", c:884, p:0, f:100, u:0},
-    {n:"Протеин (скуп 30г)", c:120, p:24, f:1, u:3}
+    {n:"Гречка (сухая)", c:330, p:12, f:3, u:72, fib: 10},
+    {n:"Овсянка", c:360, p:12, f:6, u:60, fib: 11},
+    {n:"Рис белый", c:360, p:7, f:1, u:79, fib: 1},
+    {n:"Макароны тв. сортов", c:350, p:12, f:1, u:70, fib: 3},
+    {n:"Куриная грудка (сырая)", c:113, p:23, f:2, u:0, fib: 0},
+    {n:"Говядина постная", c:180, p:20, f:10, u:0, fib: 0},
+    {n:"Индейка филе", c:115, p:24, f:1, u:0, fib: 0},
+    {n:"Лосось (свежий)", c:208, p:20, f:13, u:0, fib: 0},
+    {n:"Тунец консервированный", c:116, p:26, f:1, u:0, fib: 0},
+    {n:"Яйцо (1шт)", c:70, p:6, f:5, u:0, fib: 0}, 
+    {n:"Творог 5%", c:121, p:17, f:5, u:2, fib: 0},
+    {n:"Творог 9%", c:159, p:16, f:9, u:2, fib: 0},
+    {n:"Кефир 1%", c:40, p:3, f:1, u:4, fib: 0},
+    {n:"Сыр твердый (Пармезан)", c:431, p:38, f:29, u:4, fib: 0},
+    {n:"Сыр полутвердый (Российский)", c:360, p:24, f:29, u:0, fib: 0},
+    {n:"Банан (1шт)", c:105, p:1, f:0, u:27, fib: 3},
+    {n:"Яблоко (1шт)", c:95, p:0, f:0, u:25, fib: 4},
+    {n:"Огурец", c:15, p:1, f:0, u:3, fib: 1},
+    {n:"Помидор", c:20, p:1, f:0, u:4, fib: 1},
+    {n:"Брокколи", c:34, p:3, f:0, u:7, fib: 3},
+    {n:"Авокадо", c:160, p:2, f:15, u:9, fib: 7},
+    {n:"Масло оливковое", c:884, p:0, f:100, u:0, fib: 0},
+    {n:"Протеин (скуп 30г)", c:120, p:24, f:1, u:3, fib: 0}
 ];
 
 // --- СОСТОЯНИЕ ---
 let pivotDate = new Date();
 let currentTab = 'sport';
-let userGoals = { c: 2500, p: 160, f: 70, u: 300, water: 2000 };
+let userGoals = JSON.parse(localStorage.getItem('tma_user_goals')) || { c: 2500, p: 160, f: 70, u: 300, fib: 30, water: 2000 };
 let sportData = {};
 let charts = {};
 let calPivot = new Date();
 
 let selectedFoodBase = null;
 let isCardioSelected = false;
-let currentTplType = 'workout'; // 'workout' или 'meal'
+let currentTplType = 'workout'; 
 let currentMealForAdd = '';
 
 // --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE ---
@@ -76,7 +79,6 @@ async function initData() {
     setSyncStatus('loading');
     try { sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {}; } catch(e) { sportData = {}; }
     
-    // Инициализация глобальных шаблонов, если их нет
     if(!sportData._templates) sportData._templates = [];
     if(!sportData._mealTemplates) sportData._mealTemplates =[];
     
@@ -235,16 +237,25 @@ function addSet(name) {
 function updateSet(idx, field, val) { sportData[iso(pivotDate)].workout[idx][field] = val; save(); }
 function deleteSet(idx) { haptic('medium'); sportData[iso(pivotDate)].workout.splice(idx, 1); save(); render(); }
 
-// === ШАБЛОНЫ ТРЕНИРОВОК И ПИТАНИЯ ===
+function shareWorkout() {
+    haptic('medium');
+    const dk = iso(pivotDate);
+    const day = sportData[dk];
+    if (!day || !day.workout || day.workout.length === 0) return alert('Нет тренировок для шеринга!');
+    let tonnage = 0;
+    day.workout.forEach(w => tonnage += (parseFloat(w.w)||0) * (parseFloat(w.r)||0));
+    const text = `🔥 Отличная тренировка!\nТоннаж: ${tonnage} кг\nПодходов: ${day.workout.length}`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/your_bot_name/app')}&text=${encodeURIComponent(text)}`;
+    tg.openTelegramLink(url);
+}
+
+// === ШАБЛОНЫ ===
 function openSaveTplModal(type, mealType = '') {
     haptic('light');
-    currentTplType = type;
-    currentMealForAdd = mealType;
+    currentTplType = type; currentMealForAdd = mealType;
     const dk = iso(pivotDate);
-    
     if(type === 'workout' && sportData[dk].workout.length === 0) return alert('Тренировка пуста!');
     if(type === 'meal' && sportData[dk].food.filter(f => f.type === mealType).length === 0) return alert('Прием пищи пуст!');
-    
     $('tplNameInput').value = type === 'meal' ? mealType : '';
     $('saveTplModal').style.display = 'flex';
 }
@@ -253,24 +264,19 @@ function confirmSaveTemplate() {
     const name = $('tplNameInput').value;
     if(!name) return alert('Введите название!');
     const dk = iso(pivotDate);
-    
     if(currentTplType === 'workout') {
         sportData._templates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(sportData[dk].workout)) });
     } else if(currentTplType === 'meal') {
         const items = sportData[dk].food.filter(f => f.type === currentMealForAdd);
         sportData._mealTemplates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(items)) });
     }
-    
     haptic('success'); save(); closeModal('saveTplModal');
 }
 
 function openLoadTplModal(type, mealType = '') {
     haptic('light');
-    currentTplType = type;
-    currentMealForAdd = mealType;
-    const list = $('tplList');
-    list.innerHTML = '';
-    
+    currentTplType = type; currentMealForAdd = mealType;
+    const list = $('tplList'); list.innerHTML = '';
     const tpls = type === 'workout' ? sportData._templates : sportData._mealTemplates;
     
     if(!tpls || tpls.length === 0) {
@@ -306,7 +312,7 @@ function deleteTemplate(id) {
     if(confirm('Удалить шаблон?')) {
         if(currentTplType === 'workout') sportData._templates = sportData._templates.filter(x => x.id !== id);
         else sportData._mealTemplates = sportData._mealTemplates.filter(x => x.id !== id);
-        save(); openLoadTplModal(currentTplType, currentMealForAdd); // Перерисовка списка
+        save(); openLoadTplModal(currentTplType, currentMealForAdd);
     }
 }
 
@@ -330,11 +336,14 @@ function calcRM() {
 // === МОДУЛЬ ПИТАНИЯ ===
 function renderNutrition(dk) {
     const dayData = sportData[dk];
-    let tc=0, tp=0, tf=0, tu=0;
-    dayData.food.forEach(f => { tc+=f.c; tp+=f.p; tf+=f.f; tu+=f.u; });
+    let tc=0, tp=0, tf=0, tu=0, tfib=0;
+    dayData.food.forEach(f => { tc+=f.c; tp+=f.p; tf+=f.f; tu+=f.u; tfib+=(f.fib||0); });
     
     $('calEaten').innerText = tc; $('calLeft').innerText = userGoals.c - tc;
-    $('pVal').innerText = `${Math.round(tp)}/${userGoals.p}`; $('fVal').innerText = `${Math.round(tf)}/${userGoals.f}`; $('cVal').innerText = `${Math.round(tu)}/${userGoals.u}`;
+    $('pVal').innerText = `${Math.round(tp)}/${userGoals.p}`; 
+    $('fVal').innerText = `${Math.round(tf)}/${userGoals.f}`; 
+    $('cVal').innerText = `${Math.round(tu)}/${userGoals.u}`;
+    $('fibVal').innerText = `${Math.round(tfib)}/${userGoals.fib}`;
     
     const waterVal = dayData.water || 0;
     $('waterVal').innerHTML = `${waterVal} <span class="text-lg opacity-50">/ ${userGoals.water}</span>`;
@@ -361,7 +370,7 @@ function renderNutrition(dk) {
                     <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
                         <div>
                             <p class="font-bold text-sm">${f.n}</p>
-                            <p class="text-[10px] text-slate-400 font-bold">${f.w}${f.n.includes('шт') ? 'шт' : 'г'} • Б:${f.p} Ж:${f.f} У:${f.u}</p>
+                            <p class="text-[10px] text-slate-400 font-bold">${f.w}${f.n.includes('шт') ? 'шт' : 'г'} • Б:${f.p} Ж:${f.f} У:${f.u} Кл:${f.fib||0}</p>
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="font-black text-sm">${f.c}</span>
@@ -374,7 +383,28 @@ function renderNutrition(dk) {
     }).join('');
 }
 
-function addWater(amount) { haptic('light'); const dk = iso(pivotDate); sportData[dk].water = (sportData[dk].water || 0) + amount; save(); render(); }
+function addWater(amount) { 
+    haptic('light'); 
+    const dk = iso(pivotDate); 
+    sportData[dk].water = Math.max(0, (sportData[dk].water || 0) + amount); 
+    save(); render(); 
+}
+
+function openGoalModal() {
+    haptic('light');
+    $('goalC').value = userGoals.c; $('goalP').value = userGoals.p; $('goalF').value = userGoals.f;
+    $('goalU').value = userGoals.u; $('goalFib').value = userGoals.fib; $('goalWater').value = userGoals.water;
+    $('goalModal').style.display = 'flex';
+}
+
+function saveGoals() {
+    userGoals = {
+        c: parseInt($('goalC').value)||2500, p: parseInt($('goalP').value)||160, f: parseInt($('goalF').value)||70,
+        u: parseInt($('goalU').value)||300, fib: parseInt($('goalFib').value)||30, water: parseInt($('goalWater').value)||2000
+    };
+    localStorage.setItem('tma_user_goals', JSON.stringify(userGoals));
+    haptic('success'); render(); closeModal('goalModal');
+}
 
 function openFoodModal(meal) {
     haptic('light'); currentMealForAdd = meal; $('foodMealType').value = meal; $('foodModal').style.display = 'flex';
@@ -387,11 +417,16 @@ function filterFood() {
     const q = $('foodSearch').value.toLowerCase(); const res = $('foodSearchResults'); res.innerHTML = '';
     if(!q) return;
     
-    // 1. Локальный поиск
     FOOD_DB.filter(f => f.n.toLowerCase().includes(q)).forEach(f => {
         const div = document.createElement('div');
-        div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between';
-        div.innerHTML = `<span>${f.n}</span><span class="text-slate-400 text-xs">${f.c} ккал</span>`;
+        div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center';
+        div.innerHTML = `
+            <div class="flex items-center gap-3">
+                <div class="food-img-thumb flex items-center justify-center text-slate-300"><i class="fa-solid fa-utensils text-xs"></i></div>
+                <span>${f.n}</span>
+            </div>
+            <span class="text-slate-400 text-xs">${f.c} ккал</span>
+        `;
         div.onclick = () => {
             selectedFoodBase = f; $('customFoodName').value = f.n; 
             const isPiece = f.n.includes('шт'); $('customFoodWeightLabel').innerText = isPiece ? 'Кол-во (шт)' : 'Вес (г)'; $('customFoodWeight').value = isPiece ? 1 : 100;
@@ -400,7 +435,6 @@ function filterFood() {
         res.appendChild(div);
     });
 
-    // 2. Глобальный поиск (OpenFoodFacts) через 800мс после ввода
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => searchFoodOnline(q), 800);
 }
@@ -408,7 +442,7 @@ function filterFood() {
 async function searchFoodOnline(q) {
     const res = $('foodSearchResults');
     try {
-        const resp = await fetch(`https://ru.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,nutriments`);
+        const resp = await fetch(`https://ru.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,nutriments,image_front_small_url`);
         const data = await resp.json();
         if(data.products && data.products.length > 0) {
             data.products.forEach(p => {
@@ -418,11 +452,22 @@ async function searchFoodOnline(q) {
                     c: Math.round(p.nutriments['energy-kcal'] || 0),
                     p: Math.round(p.nutriments.proteins || 0),
                     f: Math.round(p.nutriments.fat || 0),
-                    u: Math.round(p.nutriments.carbohydrates || 0)
+                    u: Math.round(p.nutriments.carbohydrates || 0),
+                    fib: Math.round(p.nutriments.fiber_100g || 0),
+                    img: p.image_front_small_url || ''
                 };
                 const div = document.createElement('div');
-                div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between text-blue-800 bg-blue-50/50';
-                div.innerHTML = `<span>🌐 ${f.n}</span><span class="text-blue-400 text-xs">${f.c} ккал</span>`;
+                div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center text-blue-800 bg-blue-50/50';
+                
+                const imgHtml = f.img ? `<img src="${f.img}" class="food-img-thumb">` : `<div class="food-img-thumb flex items-center justify-center text-blue-300"><i class="fa-solid fa-globe text-xs"></i></div>`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        ${imgHtml}
+                        <span>${f.n}</span>
+                    </div>
+                    <span class="text-blue-400 text-xs">${f.c} ккал</span>
+                `;
                 div.onclick = () => {
                     selectedFoodBase = f; $('customFoodName').value = f.n; 
                     $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = 100;
@@ -444,6 +489,7 @@ function calcFood() {
         $('customFoodP').value = Math.round(selectedFoodBase.p * multiplier);
         $('customFoodF').value = Math.round(selectedFoodBase.f * multiplier);
         $('customFoodU').value = Math.round(selectedFoodBase.u * multiplier);
+        $('customFoodFib').value = Math.round((selectedFoodBase.fib || 0) * multiplier);
         $('customFoodC').value = Math.round(selectedFoodBase.c * multiplier);
     } else {
         const p = parseFloat($('customFoodP').value)||0, f = parseFloat($('customFoodF').value)||0, u = parseFloat($('customFoodU').value)||0;
@@ -459,7 +505,8 @@ function confirmAddFood() {
         sportData[dk].food.push({ 
             type: currentMealForAdd, n: name,
             w: parseFloat($('customFoodWeight').value)||100, p: parseFloat($('customFoodP').value)||0,
-            f: parseFloat($('customFoodF').value)||0, u: parseFloat($('customFoodU').value)||0, c: parseInt($('customFoodC').value)||0 
+            f: parseFloat($('customFoodF').value)||0, u: parseFloat($('customFoodU').value)||0, 
+            fib: parseFloat($('customFoodFib').value)||0, c: parseInt($('customFoodC').value)||0 
         });
         haptic('success'); save(); render(); closeModal('foodModal');
     } catch(e) { console.error(e); }
@@ -467,9 +514,44 @@ function confirmAddFood() {
 
 function deleteFood(idx) { haptic('medium'); sportData[iso(pivotDate)].food.splice(idx, 1); save(); render(); }
 
+function scanBarcode() {
+    haptic('heavy');
+    if(tg.showScanQrPopup) {
+        tg.showScanQrPopup({ text: 'Наведите на штрих-код продукта' }, function(text) { fetchProductByCode(text); return true; });
+    } else {
+        const code = prompt('Введите штрих-код вручную:');
+        if(code) fetchProductByCode(code);
+    }
+}
+
+async function fetchProductByCode(code) {
+    $('foodSearch').value = 'Ищем в базе...';
+    try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+        const data = await res.json();
+        if(data.status === 1) {
+            const p = data.product;
+            selectedFoodBase = {
+                n: p.product_name || 'Неизвестно',
+                p: Math.round(p.nutriments.proteins_100g || 0),
+                f: Math.round(p.nutriments.fat_100g || 0),
+                u: Math.round(p.nutriments.carbohydrates_100g || 0),
+                fib: Math.round(p.nutriments.fiber_100g || 0),
+                c: Math.round(p.nutriments['energy-kcal'] || 0)
+            };
+            $('customFoodName').value = selectedFoodBase.n;
+            $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = '100';
+            calcFood(); $('foodSearch').value = ''; haptic('success');
+        } else { 
+            alert('Продукт не найден в базе OpenFoodFacts.'); 
+            $('foodSearch').value = code; haptic('error'); 
+        }
+    } catch(e) { alert('Ошибка сети при поиске штрих-кода.'); $('foodSearch').value = ''; }
+}
+
 // === МОДУЛЬ АНАЛИТИКИ И КАЛЕНДАРЯ ===
 function renderAnalytics() {
-    const dates =[], cals = [], p=[], f=[], u=[];
+    const dates =[], cals = [], p=[], f=[], u=[], fib=[];
     let totalWo = 0, totalTon = 0;
     
     const now = new Date();
@@ -480,9 +562,9 @@ function renderAnalytics() {
         
         const day = sportData[dk] || { food:[], workout:[] };
         
-        let dc=0, dp=0, df=0, du=0;
-        day.food.forEach(item => { dc+=item.c; dp+=item.p; df+=item.f; du+=item.u; });
-        cals.push(dc); p.push(dp); f.push(df); u.push(du);
+        let dc=0, dp=0, df=0, du=0, dfib=0;
+        day.food.forEach(item => { dc+=item.c; dp+=item.p; df+=item.f; du+=item.u; dfib+=(item.fib||0); });
+        cals.push(dc); p.push(dp); f.push(df); u.push(du); fib.push(dfib);
         
         if(day.workout.length > 0) {
             totalWo++;
@@ -502,6 +584,19 @@ function renderAnalytics() {
     }, { cutout: '70%', plugins: { legend: { position: 'right' } } });
 
     renderCalendar();
+    populateExSelect();
+}
+
+function toggleCalendar() {
+    const wrap = $('calendarWrapper');
+    const icon = $('calToggleIcon');
+    if(wrap.style.maxHeight === '0px' || wrap.style.maxHeight === '') {
+        wrap.style.maxHeight = '300px';
+        icon.style.transform = 'rotate(0deg)';
+    } else {
+        wrap.style.maxHeight = '0px';
+        icon.style.transform = 'rotate(180deg)';
+    }
 }
 
 function changeCalMonth(delta) { haptic('light'); calPivot.setMonth(calPivot.getMonth() + delta); renderCalendar(); }
@@ -565,6 +660,52 @@ function openDayDetails(dk) {
         content.innerHTML = html;
     }
     $('dayModal').style.display = 'flex';
+}
+
+function populateExSelect() {
+    const select = $('analyticsExSelect');
+    if(!select) return;
+    const exSet = new Set();
+    Object.values(sportData).forEach(d => d.workout?.forEach(w => exSet.add(w.n)));
+    
+    select.innerHTML = '<option value="">Выберите упражнение...</option>';
+    Array.from(exSet).sort().forEach(ex => {
+        select.innerHTML += `<option value="${ex}">${ex}</option>`;
+    });
+}
+
+function renderExProgressChart() {
+    const exName = $('analyticsExSelect').value;
+    if(!exName) {
+        if(charts['chartExProgress']) charts['chartExProgress'].destroy();
+        return;
+    }
+    
+    const dates = [];
+    const maxWeights =[];
+    
+    // Собираем историю за последние 30 дней
+    const now = new Date();
+    for(let i=29; i>=0; i--) {
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        const dk = iso(d);
+        const dayData = sportData[dk];
+        
+        if(dayData && dayData.workout) {
+            const sets = dayData.workout.filter(w => w.n === exName);
+            if(sets.length > 0) {
+                dates.push(d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}));
+                let maxW = 0;
+                sets.forEach(s => { if(parseFloat(s.w) > maxW) maxW = parseFloat(s.w); });
+                maxWeights.push(maxW);
+            }
+        }
+    }
+    
+    drawChart('chartExProgress', 'line', {
+        labels: dates,
+        datasets:[{ label: 'Макс. вес (кг)', data: maxWeights, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }]
+    });
 }
 
 function drawChart(id, type, data, opts={}) {
