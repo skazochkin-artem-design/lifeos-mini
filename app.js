@@ -56,6 +56,7 @@ let charts = {};
 let calPivot = new Date();
 
 let selectedFoodBase = null;
+let isCardioSelected = false;
 let currentTplType = 'workout'; 
 let currentMealForAdd = '';
 let isSupersetMode = false;
@@ -66,16 +67,15 @@ function migrateData() {
     let migrated = false;
     Object.keys(sportData).forEach(date => {
         if (sportData[date].workout && sportData[date].workout.length > 0) {
-            // Если первый элемент не имеет поля sets, значит это старый формат
             if (!sportData[date].workout[0].sets) {
-                let newWorkout = [];
+                let newWorkout =[];
                 let currentEx = null;
                 sportData[date].workout.forEach(w => {
                     if (!currentEx || currentEx.name !== w.n) {
-                        currentEx = { id: Date.now()+Math.random(), name: w.n, sets:[], note: w.notes || '', supersetId: null };
+                        currentEx = { id: 'ex_'+Date.now()+Math.random(), name: w.n, sets:[], note: w.notes || '', supersetId: null };
                         newWorkout.push(currentEx);
                     }
-                    currentEx.sets.push({ id: Date.now()+Math.random(), w: w.w, r: w.r, done: true, isDrop: false, drops: [] });
+                    currentEx.sets.push({ id: 's_'+Date.now()+Math.random(), w: w.w, r: w.r, done: true, isDrop: false, drops:[] });
                 });
                 sportData[date].workout = newWorkout;
                 migrated = true;
@@ -90,7 +90,7 @@ async function initData() {
     setSyncStatus('loading');
     try { sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {}; } catch(e) { sportData = {}; }
     
-    migrateData(); // Запускаем миграцию перед рендером
+    migrateData(); 
     render(); 
     
     const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
@@ -98,7 +98,7 @@ async function initData() {
         let { data, error } = await supabaseClient.from('user_data').select('data').eq('telegram_id', tgUser.id).single();
         if (data && data.data) {
             sportData = data.data;
-            migrateData(); // На всякий случай мигрируем и облачные данные
+            migrateData(); 
             localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
             render(); setSyncStatus('success');
         } else setSyncStatus('idle');
@@ -156,21 +156,19 @@ function renderSport(dk) {
     const workout = sportData[dk].workout;
     
     if (workout.length === 0) {
-        list.innerHTML = '<div class="text-center py-10 text-slate-400 font-bold"><i class="fa-solid fa-dumbbell text-4xl mb-3 opacity-20"></i><p>Нет тренировок</p></div>';
+        list.innerHTML = '<div class="text-center py-12 text-slate-400 font-bold"><i class="fa-solid fa-dumbbell text-5xl mb-4 opacity-20"></i><p>Нет тренировок</p></div>';
         return;
     }
 
-    // Цвета для суперсетов
     const ssColors =['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
     let ssColorMap = {};
     let ssCounter = 0;
 
-    list.innerHTML = workout.map((ex, exIdx) => {
+    list.innerHTML = workout.map((ex) => {
         const isCardio = CARDIO_LIST.some(c => ex.name.toLowerCase().includes(c));
         const label1 = isCardio ? 'мин' : 'кг';
         const label2 = isCardio ? 'ур' : '×';
         
-        // Логика суперсетов
         let ssLine = '';
         let ssClass = '';
         if (ex.supersetId) {
@@ -179,59 +177,56 @@ function renderSport(dk) {
             ssClass = 'superset-linked pl-6';
         }
 
-        // Сводка (свернутый вид)
-        const summaryHtml = ex.sets.map(s => {
-            const val = `${s.w||0}${label1} ${label2} ${s.r||0}`;
-            return `<span class="${s.done ? 'done' : ''}">${val}</span>`;
-        }).join(', ');
+        const summaryHtml = ex.sets.map(s => `<span class="${s.done ? 'done' : ''}">${s.w||0}${label1} ${label2} ${s.r||0}</span>`).join(', ');
 
-        // Развернутый вид
         const expandedHtml = `
-            <div id="ex-body-${ex.id}" class="mt-3 hidden">
+            <div id="ex-body-${ex.id}" class="mt-4 hidden">
                 ${ex.note !== undefined ? `
-                    <div class="mb-3 flex gap-2">
-                        <input type="text" value="${ex.note}" onchange="updateExNote('${ex.id}', this.value)" placeholder="Заметка к упражнению..." class="custom-input text-xs py-2 flex-1">
+                    <div class="mb-4 flex gap-2">
+                        <input type="text" value="${ex.note}" onchange="updateExNote('${ex.id}', this.value)" placeholder="Заметка к упражнению..." class="custom-input text-sm py-3 flex-1">
                     </div>
                 ` : ''}
-                <div class="space-y-1">
+                <div class="space-y-2">
                     ${ex.sets.map((s, sIdx) => `
                         <div>
                             <div class="set-row ${!s.done ? 'set-ghost' : ''}">
                                 <div class="check-btn ${s.done ? 'done' : ''}" onclick="toggleSetDone('${ex.id}', '${s.id}')">
-                                    ${s.done ? '<i class="fa-solid fa-check text-xs"></i>' : '<span class="text-xs font-bold">'+(sIdx+1)+'</span>'}
+                                    ${s.done ? '<i class="fa-solid fa-check"></i>' : sIdx+1}
                                 </div>
-                                <input type="number" value="${s.w}" onchange="updateSetVal('${ex.id}', '${s.id}', 'w', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Время' : 'Вес'}">
-                                <span class="text-xs text-slate-400">${label1}</span>
-                                <span class="text-slate-300 mx-1">${isCardio ? '|' : label2}</span>
-                                <input type="number" value="${s.r}" onchange="updateSetVal('${ex.id}', '${s.id}', 'r', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Уровень' : 'Повт'}">
-                                
-                                <div class="relative ml-2">
-                                    <button onclick="toggleSetMenu('${s.id}')" class="text-slate-400 hover:text-slate-600 px-2"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-                                    <div id="menu-${s.id}" class="hidden absolute right-0 top-full mt-1 bg-white shadow-lg rounded-xl border border-slate-100 z-20 w-32 overflow-hidden">
-                                        <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-2 text-xs font-bold text-purple-600 hover:bg-purple-50">Дропсет</button>
-                                        <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50">Удалить</button>
+                                <div class="flex-1 flex justify-center items-center gap-1">
+                                    <input type="number" value="${s.w}" onchange="updateSetVal('${ex.id}', '${s.id}', 'w', this.value)" class="set-input" placeholder="-">
+                                    <span class="text-slate-400 font-bold text-sm">${label1}</span>
+                                    <span class="text-slate-300 font-black text-lg mx-1">${isCardio ? '|' : label2}</span>
+                                    <input type="number" value="${s.r}" onchange="updateSetVal('${ex.id}', '${s.id}', 'r', this.value)" class="set-input" placeholder="-">
+                                </div>
+                                <div class="relative">
+                                    <button onclick="toggleSetMenu('${s.id}')" class="text-slate-400 hover:text-slate-600 p-2"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                    <div id="menu-${s.id}" class="hidden absolute right-0 top-full mt-1 bg-white shadow-xl rounded-xl border border-slate-100 z-20 w-32 overflow-hidden">
+                                        <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-purple-600 hover:bg-purple-50">Дропсет</button>
+                                        <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">Удалить</button>
                                     </div>
                                 </div>
                             </div>
                             ${s.isDrop ? `
-                                <div class="pl-8 space-y-1 mt-1 mb-2 border-l-2 border-purple-200 ml-3">
+                                <div class="pl-10 space-y-2 mt-2 mb-3 border-l-2 border-purple-200 ml-4">
                                     ${s.drops.map((d, dIdx) => `
-                                        <div class="flex items-center gap-2 bg-purple-50/50 p-1.5 rounded-lg">
-                                            <i class="fa-solid fa-arrow-turn-down text-[10px] text-purple-300"></i>
-                                            <input type="number" value="${d.w}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'w', this.value)" class="set-input w-12 text-sm bg-white" placeholder="Вес">
-                                            <span class="text-[10px] text-slate-400">×</span>
-                                            <input type="number" value="${d.r}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'r', this.value)" class="set-input w-12 text-sm bg-white" placeholder="Повт">
-                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="text-slate-300 hover:text-red-500 ml-auto px-2"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                                        <div class="drop-row bg-purple-50/50 rounded-xl pr-2">
+                                            <div class="flex-1 flex justify-center items-center gap-1">
+                                                <input type="number" value="${d.w}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'w', this.value)" class="set-input bg-white" placeholder="-">
+                                                <span class="text-slate-300 font-black text-lg mx-1">×</span>
+                                                <input type="number" value="${d.r}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'r', this.value)" class="set-input bg-white" placeholder="-">
+                                            </div>
+                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-xmark"></i></button>
                                         </div>
                                     `).join('')}
-                                    <button onclick="addDrop('${ex.id}', '${s.id}')" class="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-1 rounded-md mt-1">+ Сброс веса</button>
+                                    <button onclick="addDrop('${ex.id}', '${s.id}')" class="text-xs font-bold text-purple-500 bg-purple-50 px-3 py-2 rounded-lg mt-1">+ Сброс веса</button>
                                 </div>
                             ` : ''}
                         </div>
                     `).join('')}
                 </div>
-                <div class="flex gap-2 mt-3">
-                    <button onclick="addSet('${ex.id}')" class="flex-1 bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition">+ Подход</button>
+                <div class="mt-4">
+                    <button onclick="addSet('${ex.id}')" class="w-full bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition">+ Добавить подход</button>
                 </div>
             </div>
         `;
@@ -239,19 +234,19 @@ function renderSport(dk) {
         return `
         <div class="ex-card ${ssClass}">
             ${ssLine}
-            ${isSupersetMode ? `<input type="checkbox" class="absolute right-4 top-4 w-5 h-5 accent-blue-500 z-10" onchange="toggleSupersetSelection('${ex.id}', this.checked)">` : ''}
+            ${isSupersetMode ? `<input type="checkbox" class="absolute right-5 top-5 w-6 h-6 accent-blue-500 z-10" onchange="toggleSupersetSelection('${ex.id}', this.checked)">` : ''}
             
             <div class="flex justify-between items-start cursor-pointer" onclick="toggleExExpand('${ex.id}')">
                 <div class="flex-1 pr-8">
                     <div class="flex items-center gap-2">
-                        <h4 class="font-black text-slate-800">${ex.name}</h4>
-                        ${ex.note ? '<i class="fa-regular fa-comment-dots text-blue-400 text-xs"></i>' : ''}
+                        <h4 class="font-black text-xl text-slate-800">${ex.name}</h4>
+                        ${ex.note ? '<i class="fa-regular fa-comment-dots text-blue-400 text-sm"></i>' : ''}
                     </div>
-                    <div class="ex-summary mt-1" id="ex-sum-${ex.id}">${summaryHtml || 'Нет подходов'}</div>
+                    <div class="ex-summary mt-2" id="ex-sum-${ex.id}">${summaryHtml || 'Нет подходов'}</div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="event.stopPropagation(); toggleNote('${ex.id}')" class="text-slate-300 hover:text-blue-500"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="text-slate-300 hover:text-red-500"><i class="fa-solid fa-trash"></i></button>
+                <div class="flex items-center gap-4">
+                    <button onclick="event.stopPropagation(); toggleNote('${ex.id}')" class="text-slate-300 hover:text-blue-500 text-lg"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="text-slate-300 hover:text-red-500 text-lg"><i class="fa-solid fa-trash"></i></button>
                 </div>
             </div>
             ${expandedHtml}
@@ -260,231 +255,142 @@ function renderSport(dk) {
     }).join('');
 }
 
-// --- ЛОГИКА УПРАЖНЕНИЙ ---
 function toggleExExpand(id) {
-    const body = $(`ex-body-${id}`);
-    const sum = $(`ex-sum-${id}`);
-    if(body.classList.contains('hidden')) {
-        body.classList.remove('hidden');
-        sum.classList.add('hidden');
-    } else {
-        body.classList.add('hidden');
-        sum.classList.remove('hidden');
-    }
+    const body = $(`ex-body-${id}`); const sum = $(`ex-sum-${id}`);
+    if(body.classList.contains('hidden')) { body.classList.remove('hidden'); sum.classList.add('hidden'); } 
+    else { body.classList.add('hidden'); sum.classList.remove('hidden'); }
 }
 
 function toggleNote(id) {
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === id);
-    if(ex.note === undefined) ex.note = '';
-    save(); render();
-    // Автоматически разворачиваем
-    const body = $(`ex-body-${id}`);
-    if(body && body.classList.contains('hidden')) toggleExExpand(id);
+    const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === id);
+    if(ex.note === undefined) ex.note = ''; save(); render();
+    const body = $(`ex-body-${id}`); if(body && body.classList.contains('hidden')) toggleExExpand(id);
 }
 
-function updateExNote(id, val) {
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === id);
-    if(ex) { ex.note = val; save(); }
-}
+function updateExNote(id, val) { const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === id); if(ex) { ex.note = val; save(); } }
+function deleteExercise(id) { if(confirm('Удалить упражнение?')) { const dk = iso(pivotDate); sportData[dk].workout = sportData[dk].workout.filter(w => w.id !== id); save(); render(); } }
 
-function deleteExercise(id) {
-    if(confirm('Удалить упражнение?')) {
-        const dk = iso(pivotDate);
-        sportData[dk].workout = sportData[dk].workout.filter(w => w.id !== id);
-        save(); render();
-    }
-}
-
-// --- ЛОГИКА ПОДХОДОВ ---
 function toggleSetDone(exId, setId) {
-    haptic('light');
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
-    const set = ex.sets.find(s => s.id === setId);
-    set.done = !set.done;
-    save(); render();
+    haptic('light'); const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId); set.done = !set.done; save(); render();
 }
 
 function updateSetVal(exId, setId, field, val) {
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
-    const set = ex.sets.find(s => s.id === setId);
-    set[field] = val;
-    set.done = true; // Автоматически отмечаем как выполненный при вводе
-    save();
+    const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId); set[field] = val; set.done = true; save();
 }
 
 function addSet(exId) {
-    haptic('light');
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
+    haptic('light'); const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId);
     const lastSet = ex.sets[ex.sets.length - 1];
-    ex.sets.push({ id: Date.now()+Math.random(), w: lastSet?.w||'', r: lastSet?.r||'', done: false, isDrop: false, drops:[] });
-    save(); render();
-    // Оставляем развернутым
-    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+    ex.sets.push({ id: 's_'+Date.now()+Math.random(), w: lastSet?.w||'', r: lastSet?.r||'', done: false, isDrop: false, drops:[] });
+    save(); render(); setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
 }
 
 function deleteSet(exId, setId) {
-    haptic('medium');
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
-    ex.sets = ex.sets.filter(s => s.id !== setId);
-    save(); render();
-    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+    haptic('medium'); const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId);
+    ex.sets = ex.sets.filter(s => s.id !== setId); save(); render(); setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
 }
 
 function toggleSetMenu(setId) {
-    const menu = $(`menu-${setId}`);
-    menu.classList.toggle('hidden');
-    // Закрываем по клику вне
+    const menu = $(`menu-${setId}`); menu.classList.toggle('hidden');
     const closeMenu = (e) => { if(!e.target.closest('.relative')) { menu.classList.add('hidden'); document.removeEventListener('click', closeMenu); } };
     setTimeout(() => document.addEventListener('click', closeMenu), 10);
 }
 
-// --- ЛОГИКА ДРОПСЕТОВ ---
 function makeDropSet(exId, setId) {
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
-    const set = ex.sets.find(s => s.id === setId);
-    set.isDrop = true;
-    if(!set.drops) set.drops =[];
-    set.drops.push({ w: '', r: '' }); // Добавляем первую ступень
-    save(); render();
+    const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId); const set = ex.sets.find(s => s.id === setId);
+    set.isDrop = true; if(!set.drops) set.drops =[]; set.drops.push({ w: '', r: '' }); save(); render();
     setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
 }
 
 function addDrop(exId, setId) {
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
-    const set = ex.sets.find(s => s.id === setId);
-    set.drops.push({ w: '', r: '' });
-    save(); render();
+    const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId); const set = ex.sets.find(s => s.id === setId);
+    set.drops.push({ w: '', r: '' }); save(); render();
     setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
 }
 
 function updateDropVal(exId, setId, dropIdx, field, val) {
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
-    const set = ex.sets.find(s => s.id === setId);
-    set.drops[dropIdx][field] = val;
-    set.done = true;
-    save();
+    const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId); const set = ex.sets.find(s => s.id === setId);
+    set.drops[dropIdx][field] = val; set.done = true; save();
 }
 
 function deleteDrop(exId, setId, dropIdx) {
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === exId);
-    const set = ex.sets.find(s => s.id === setId);
-    set.drops.splice(dropIdx, 1);
-    if(set.drops.length === 0) set.isDrop = false; // Если удалили все дропы, это обычный подход
-    save(); render();
+    const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId); const set = ex.sets.find(s => s.id === setId);
+    set.drops.splice(dropIdx, 1); if(set.drops.length === 0) set.isDrop = false; save(); render();
     setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
 }
 
-// --- ЛОГИКА СУПЕРСЕТОВ ---
 function toggleSupersetMode() {
-    isSupersetMode = !isSupersetMode;
-    selectedForSuperset =[];
-    $('btnSuperset').classList.toggle('bg-blue-500', isSupersetMode);
-    $('btnSuperset').classList.toggle('text-white', isSupersetMode);
-    $('supersetPanel').classList.toggle('hidden', !isSupersetMode);
-    render();
+    isSupersetMode = !isSupersetMode; selectedForSuperset =[];
+    $('btnSuperset').classList.toggle('bg-blue-500', isSupersetMode); $('btnSuperset').classList.toggle('text-white', isSupersetMode);
+    $('supersetPanel').classList.toggle('hidden', !isSupersetMode); render();
 }
 
-function toggleSupersetSelection(id, isChecked) {
-    if(isChecked) selectedForSuperset.push(id);
-    else selectedForSuperset = selectedForSuperset.filter(x => x !== id);
-}
+function toggleSupersetSelection(id, isChecked) { if(isChecked) selectedForSuperset.push(id); else selectedForSuperset = selectedForSuperset.filter(x => x !== id); }
 
-function cancelSuperset() {
-    isSupersetMode = false;
-    selectedForSuperset =[];
-    $('btnSuperset').classList.remove('bg-blue-500', 'text-white');
-    $('supersetPanel').classList.add('hidden');
-    render();
-}
+function cancelSuperset() { isSupersetMode = false; selectedForSuperset =[]; $('btnSuperset').classList.remove('bg-blue-500', 'text-white'); $('supersetPanel').classList.add('hidden'); render(); }
 
 function confirmSuperset() {
     if(selectedForSuperset.length < 2) return alert('Выберите минимум 2 упражнения!');
-    const dk = iso(pivotDate);
-    const ssId = 'ss_' + Date.now();
-    
-    // Присваиваем ID суперсета выбранным упражнениям
-    sportData[dk].workout.forEach(w => {
-        if(selectedForSuperset.includes(w.id)) w.supersetId = ssId;
-    });
-    
-    // Сортируем массив, чтобы упражнения суперсета шли друг за другом
-    sportData[dk].workout.sort((a, b) => {
-        if(a.supersetId === ssId && b.supersetId !== ssId) return -1;
-        if(a.supersetId !== ssId && b.supersetId === ssId) return 1;
-        return 0;
-    });
-
-    save();
-    cancelSuperset(); // Выключает режим и рендерит
+    const dk = iso(pivotDate); const ssId = 'ss_' + Date.now();
+    sportData[dk].workout.forEach(w => { if(selectedForSuperset.includes(w.id)) w.supersetId = ssId; });
+    sportData[dk].workout.sort((a, b) => { if(a.supersetId === ssId && b.supersetId !== ssId) return -1; if(a.supersetId !== ssId && b.supersetId === ssId) return 1; return 0; });
+    save(); cancelSuperset();
 }
 
-// --- ДОБАВЛЕНИЕ УПРАЖНЕНИЯ (С АВТОЗАПОЛНЕНИЕМ) ---
 function openExModal() {
-    haptic('light');
-    $('exModal').style.display = 'flex';
-    $('exSearch').value = '';
-    filterEx();
+    haptic('light'); $('exModal').style.display = 'flex'; $('exSearch').value = ''; filterEx();
 }
 
 function filterEx() {
-    const q = $('exSearch').value.toLowerCase();
-    const res = $('exSearchResults');
-    res.innerHTML = '';
+    const q = $('exSearch').value.toLowerCase(); const res = $('exSearchResults'); res.innerHTML = '';
     EX_DB.filter(ex => ex.toLowerCase().includes(q)).forEach(ex => {
         const div = document.createElement('div');
-        div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50';
+        div.className = 'p-4 hover:bg-slate-50 rounded-2xl font-bold text-base cursor-pointer border-b border-slate-50';
         div.innerText = ex;
-        div.onclick = () => confirmAddEx(ex); // Сразу добавляем по клику
+        div.onclick = () => confirmAddEx(ex);
         res.appendChild(div);
     });
 }
 
 function confirmAddEx(name) {
     const dk = iso(pivotDate);
-    
-    // Ищем прошлые результаты для автозаполнения (Ghost Sets)
     let pastSets =[];
     const dates = Object.keys(sportData).sort().reverse();
     for (let d of dates) {
-        if (d >= dk) continue; // Ищем только в прошлом
+        if (d >= dk) continue;
         const pastEx = sportData[d].workout?.find(w => w.name === name);
         if (pastEx && pastEx.sets.length > 0) {
-            // Копируем подходы, но делаем их "призрачными" (done: false)
-            pastSets = pastEx.sets.map(s => ({
-                id: Date.now() + Math.random(),
-                w: s.w, r: s.r,
-                done: false, // ВАЖНО: они серые, пока юзер не подтвердит
-                isDrop: s.isDrop || false,
-                drops: s.drops ? JSON.parse(JSON.stringify(s.drops)) :[]
-            }));
+            pastSets = pastEx.sets.map(s => ({ id: 's_'+Date.now()+Math.random(), w: s.w, r: s.r, done: false, isDrop: s.isDrop || false, drops: s.drops ? JSON.parse(JSON.stringify(s.drops)) :[] }));
             break;
         }
     }
+    if (pastSets.length === 0) { for(let i=0; i<3; i++) pastSets.push({ id: 's_'+Date.now()+Math.random(), w: '', r: '', done: false, isDrop: false, drops:[] }); }
+    sportData[dk].workout.push({ id: 'ex_' + Date.now(), name: name, sets: pastSets, supersetId: null });
+    haptic('success'); save(); render(); closeModal('exModal');
+}
 
-    // Если истории нет, даем 3 пустых подхода
-    if (pastSets.length === 0) {
-        for(let i=0; i<3; i++) pastSets.push({ id: Date.now()+Math.random(), w: '', r: '', done: false, isDrop: false, drops:[] });
-    }
+function shareWorkout() {
+    haptic('medium'); const dk = iso(pivotDate); const day = sportData[dk];
+    if (!day || !day.workout || day.workout.length === 0) return alert('Нет тренировок для шеринга!');
+    let tonnage = 0;
+    day.workout.forEach(w => { if(w.sets) w.sets.forEach(s => tonnage += (parseFloat(s.w)||0)*(parseFloat(s.r)||0)); });
+    const text = `🔥 Отличная тренировка!\nТоннаж: ${tonnage} кг\nУпражнений: ${day.workout.length}`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/your_bot_name/app')}&text=${encodeURIComponent(text)}`;
+    if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) window.Telegram.WebApp.openTelegramLink(url); else window.open(url, '_blank');
+}
 
-    sportData[dk].workout.push({ 
-        id: Date.now()+Math.random(), 
-        name: name, 
-        sets: pastSets,
-        supersetId: null
-    });
-    
-    haptic('success');
-    save(); render(); closeModal('exModal');
+// === КАЛЬКУЛЯТОР 1RM ===
+function openRmModal() { haptic('light'); $('rmModal').style.display = 'flex'; $('rmW').value = ''; $('rmR').value = ''; calcRM(); }
+function calcRM() {
+    const w = parseFloat($('rmW').value) || 0, r = parseFloat($('rmR').value) || 0;
+    if (w > 0 && r > 0) {
+        const rm = Math.round(w * (1 + r / 30));
+        $('rmResult').innerText = rm + ' кг';
+        $('rm90').innerText = Math.round(rm * 0.9); $('rm80').innerText = Math.round(rm * 0.8);
+        $('rm70').innerText = Math.round(rm * 0.7); $('rm60').innerText = Math.round(rm * 0.6);
+    } else { $('rmResult').innerText = '0 кг';['rm90','rm80','rm70','rm60'].forEach(id => $(id).innerText = '0'); }
 }
 
 // === МОДУЛЬ ПИТАНИЯ ===
@@ -521,7 +427,7 @@ function renderNutrition(dk) {
         
         let mTotal = mp + mf + mu + mfib;
         let mealBar = mTotal > 0 ? `
-            <div class="flex h-1 w-full rounded-full overflow-hidden mt-2 opacity-80">
+            <div class="flex h-1.5 w-full rounded-full overflow-hidden mt-3 opacity-80">
                 <div class="bg-green-500" style="width:${(mp/mTotal)*100}%"></div>
                 <div class="bg-red-500" style="width:${(mf/mTotal)*100}%"></div>
                 <div class="bg-blue-500" style="width:${(mu/mTotal)*100}%"></div>
@@ -532,18 +438,18 @@ function renderNutrition(dk) {
         return `
         <div class="card">
             <div class="flex justify-between items-center mb-3">
-                <h4 class="font-black text-lg">${meal}</h4>
+                <h4 class="font-black text-xl">${meal}</h4>
                 <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-400 mr-2">${mc} ккал</span>
-                    <button onclick="openFoodModal('${meal}')" class="w-8 h-8 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
+                    <span class="text-sm font-bold text-slate-400 mr-2">${mc} ккал</span>
+                    <button onclick="openFoodModal('${meal}')" class="w-10 h-10 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center text-lg"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
             ${mealBar}
-            <div class="space-y-2 mt-3">
-                ${items.length === 0 ? '<p class="text-xs text-slate-300 font-bold">Пусто</p>' : items.map(f => {
+            <div class="space-y-3 mt-4">
+                ${items.length === 0 ? '<p class="text-sm text-slate-300 font-bold">Пусто</p>' : items.map(f => {
                     let fTotal = f.p + f.f + f.u + (f.fib||0);
                     let foodBar = fTotal > 0 ? `
-                        <div class="flex h-1 w-full rounded-full overflow-hidden mt-1.5 opacity-60">
+                        <div class="flex h-1 w-full rounded-full overflow-hidden mt-2 opacity-60">
                             <div class="bg-green-500" style="width:${(f.p/fTotal)*100}%"></div>
                             <div class="bg-red-500" style="width:${(f.f/fTotal)*100}%"></div>
                             <div class="bg-blue-500" style="width:${(f.u/fTotal)*100}%"></div>
@@ -551,15 +457,15 @@ function renderNutrition(dk) {
                         </div>
                     ` : '';
                     return `
-                    <div class="flex justify-between items-center bg-slate-50 p-3 rounded-xl">
+                    <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
                         <div class="flex-1 mr-4">
-                            <p class="font-bold text-sm">${f.n}</p>
-                            <p class="text-[10px] text-slate-400 font-bold">${f.w}${f.n.includes('шт') ? 'шт' : 'г'} • Б:${f.p} Ж:${f.f} У:${f.u} Кл:${f.fib||0}</p>
+                            <p class="font-bold text-base">${f.n}</p>
+                            <p class="text-xs text-slate-400 font-bold mt-1">${f.w}${f.n.includes('шт') ? 'шт' : 'г'} • Б:${f.p} Ж:${f.f} У:${f.u} Кл:${f.fib||0}</p>
                             ${foodBar}
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="font-black text-sm">${f.c}</span>
-                            <button onclick="deleteFood(${dayData.food.indexOf(f)})" class="text-slate-300 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
+                        <div class="flex items-center gap-4">
+                            <span class="font-black text-lg">${f.c}</span>
+                            <button onclick="deleteFood(${dayData.food.indexOf(f)})" class="text-slate-300 hover:text-red-500 text-lg"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
                 `}).join('')}
@@ -568,12 +474,7 @@ function renderNutrition(dk) {
     }).join('');
 }
 
-function addWater(amount) { 
-    haptic('light'); 
-    const dk = iso(pivotDate); 
-    sportData[dk].water = Math.max(0, (sportData[dk].water || 0) + amount); 
-    save(); render(); 
-}
+function addWater(amount) { haptic('light'); const dk = iso(pivotDate); sportData[dk].water = Math.max(0, (sportData[dk].water || 0) + amount); save(); render(); }
 
 function openGoalModal() {
     haptic('light');
@@ -604,13 +505,13 @@ function filterFood() {
     
     FOOD_DB.filter(f => f.n.toLowerCase().includes(q)).forEach(f => {
         const div = document.createElement('div');
-        div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center';
+        div.className = 'p-4 hover:bg-slate-50 rounded-2xl font-bold text-base cursor-pointer border-b border-slate-50 flex justify-between items-center';
         div.innerHTML = `
             <div class="flex items-center gap-3">
-                <div class="food-img-thumb flex items-center justify-center text-slate-300"><i class="fa-solid fa-utensils text-xs"></i></div>
+                <div class="food-img-thumb flex items-center justify-center text-slate-300"><i class="fa-solid fa-utensils text-sm"></i></div>
                 <span>${f.n}</span>
             </div>
-            <span class="text-slate-400 text-xs">${f.c} ккал</span>
+            <span class="text-slate-400 text-sm">${f.c} ккал</span>
         `;
         div.onclick = () => {
             selectedFoodBase = f; $('customFoodName').value = f.n; 
@@ -642,16 +543,16 @@ async function searchFoodOnline(q) {
                     img: p.image_front_small_url || ''
                 };
                 const div = document.createElement('div');
-                div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50 flex justify-between items-center text-blue-800 bg-blue-50/50';
+                div.className = 'p-4 hover:bg-slate-50 rounded-2xl font-bold text-base cursor-pointer border-b border-slate-50 flex justify-between items-center text-blue-800 bg-blue-50/50';
                 
-                const imgHtml = f.img ? `<img src="${f.img}" class="food-img-thumb">` : `<div class="food-img-thumb flex items-center justify-center text-blue-300"><i class="fa-solid fa-globe text-xs"></i></div>`;
+                const imgHtml = f.img ? `<img src="${f.img}" class="food-img-thumb">` : `<div class="food-img-thumb flex items-center justify-center text-blue-300"><i class="fa-solid fa-globe text-sm"></i></div>`;
                 
                 div.innerHTML = `
                     <div class="flex items-center gap-3">
                         ${imgHtml}
                         <span>${f.n}</span>
                     </div>
-                    <span class="text-blue-400 text-xs">${f.c} ккал</span>
+                    <span class="text-blue-400 text-sm">${f.c} ккал</span>
                 `;
                 div.onclick = () => {
                     selectedFoodBase = f; $('customFoodName').value = f.n; 
@@ -720,7 +621,6 @@ function scanBarcode() {
         Quagga.start();
     });
     
-    // ФИКС: Защита от множественного срабатывания
     Quagga.onDetected(function(result) {
         if(!isScanning) return;
         const code = result.codeResult.code;
@@ -774,7 +674,6 @@ function renderAnalytics() {
         if(day.workout.length > 0) {
             totalWo++;
             day.workout.forEach(w => { 
-                // Считаем тоннаж по новой структуре
                 if(w.sets) w.sets.forEach(s => totalTon += (parseFloat(s.w)||0) * (parseFloat(s.r)||0));
             });
         }
@@ -808,10 +707,10 @@ function toggleCalendar() {
     const icon = $('calToggleIcon');
     if(wrap.style.maxHeight === '0px' || wrap.style.maxHeight === '') {
         wrap.style.maxHeight = '300px';
-        icon.style.transform = 'rotate(0deg)';
+        icon.style.transform = 'rotate(180deg)';
     } else {
         wrap.style.maxHeight = '0px';
-        icon.style.transform = 'rotate(180deg)';
+        icon.style.transform = 'rotate(0deg)';
     }
 }
 
@@ -865,7 +764,7 @@ function openDayDetails(dk) {
             });
             html += `<h4 class="font-black text-sm mb-2 text-blue-500"><i class="fa-solid fa-dumbbell"></i> Тренировка (${ton} кг)</h4>`;
             dayData.workout.forEach(w => {
-                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-2 rounded-lg mb-1 flex justify-between"><span>${w.name}</span><span>${w.sets?.length||0} подх.</span></div>`;
+                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl mb-2 flex justify-between items-center"><span>${w.name}</span><span class="bg-white px-2 py-1 rounded-lg shadow-sm">${w.sets?.length||0} подх.</span></div>`;
             });
         }
         if(dayData.food.length > 0) {
@@ -873,7 +772,7 @@ function openDayDetails(dk) {
             dayData.food.forEach(f => cal += f.c);
             html += `<h4 class="font-black text-sm mt-4 mb-2 text-orange-500"><i class="fa-solid fa-utensils"></i> Питание (${cal} ккал)</h4>`;
             dayData.food.forEach(f => {
-                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-2 rounded-lg mb-1 flex justify-between"><span>${f.n}</span><span>${f.c} ккал</span></div>`;
+                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl mb-2 flex justify-between items-center"><span>${f.n}</span><span class="bg-white px-2 py-1 rounded-lg shadow-sm">${f.c} ккал</span></div>`;
             });
         }
         content.innerHTML = html;
@@ -900,7 +799,7 @@ function renderExProgressChart() {
         return;
     }
     
-    const dates =[];
+    const dates = [];
     const maxWeights =[];
     
     const now = new Date();
