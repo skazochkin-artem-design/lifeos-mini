@@ -29,8 +29,6 @@
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); z-index: 100; display: none; align-items: flex-end; }
         .modal-content { background: var(--tg-theme-bg-color, #ffffff); width: 100%; border-radius: 30px 30px 0 0; padding: 24px; padding-bottom: 40px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .set-row { display: flex; align-items: center; gap: 8px; background: var(--tg-theme-secondary-bg-color, #f8fafc); padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; }
-        .set-input { width: 50px; text-align: center; background: transparent; font-weight: 800; font-size: 16px; outline: none; color: var(--tg-theme-text-color, #000); border: none; }
         
         .water-card { overflow: hidden; z-index: 1; }
         #waterFill { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(59, 130, 246, 0.15); z-index: -1; transition: height 0.5s ease-in-out; }
@@ -41,6 +39,27 @@
         @keyframes scan { 0% { top: 10%; } 50% { top: 90%; } 100% { top: 10%; } }
         
         .food-img-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; }
+
+        /* НОВЫЕ СТИЛИ ДЛЯ ТРЕНИРОВОК */
+        .ex-card { background: var(--tg-theme-bg-color, #ffffff); border-radius: 16px; padding: 16px; margin-bottom: 12px; position: relative; transition: all 0.2s; }
+        .ex-card.superset-linked { margin-bottom: 4px; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; }
+        .ex-card.superset-linked + .ex-card.superset-linked { border-top-left-radius: 4px; border-top-right-radius: 4px; margin-top: 0; }
+        .superset-line { position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; }
+        
+        .set-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.03); }
+        .set-row:last-child { border-bottom: none; }
+        .set-input { width: 45px; text-align: center; background: var(--tg-theme-secondary-bg-color, #f1f5f9); border-radius: 8px; padding: 6px; font-weight: 800; font-size: 14px; outline: none; color: inherit; border: 1px solid transparent; transition: 0.2s; }
+        .set-input:focus { border-color: #3b82f6; background: transparent; }
+        .set-ghost .set-input { color: #94a3b8; background: transparent; border: 1px dashed #cbd5e1; }
+        
+        .drop-row { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 20px; position: relative; }
+        .drop-row::before { content: '↳'; position: absolute; left: 6px; color: #94a3b8; font-weight: bold; }
+        
+        .check-btn { width: 28px; height: 28px; border-radius: 8px; background: #f1f5f9; color: #cbd5e1; display: flex; align-items: center; justify-content: center; transition: 0.2s; cursor: pointer; }
+        .check-btn.done { background: #22c55e; color: white; box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3); }
+        
+        .ex-summary { font-size: 12px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ex-summary span.done { color: var(--tg-theme-text-color, #0f172a); font-weight: 800; }
     </style>
 </head>
 <body>
@@ -67,12 +86,21 @@
                     <button onclick="openRmModal()" class="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-1 rounded-lg uppercase">1RM</button>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="openSaveTplModal('workout')" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full shadow-sm flex items-center justify-center" title="Сохранить шаблон"><i class="fa-solid fa-floppy-disk"></i></button>
-                    <button onclick="openLoadTplModal('workout')" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full shadow-sm flex items-center justify-center" title="Загрузить шаблон"><i class="fa-solid fa-folder-open"></i></button>
+                    <button onclick="toggleSupersetMode()" id="btnSuperset" class="w-10 h-10 bg-slate-100 text-slate-500 rounded-full shadow-sm flex items-center justify-center transition"><i class="fa-solid fa-link"></i></button>
                     <button onclick="openExModal()" class="w-10 h-10 bg-blue-500 text-white rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
-            <div id="workoutList" class="space-y-4"></div>
+            
+            <!-- Панель суперсета (скрыта по умолчанию) -->
+            <div id="supersetPanel" class="hidden bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex justify-between items-center">
+                <span class="text-xs font-bold text-blue-700">Выберите упражнения</span>
+                <div class="flex gap-2">
+                    <button onclick="cancelSuperset()" class="text-xs font-bold text-slate-500 px-3 py-1">Отмена</button>
+                    <button onclick="confirmSuperset()" class="text-xs font-bold bg-blue-500 text-white px-3 py-1 rounded-lg shadow-sm">Объединить</button>
+                </div>
+            </div>
+
+            <div id="workoutList" class="space-y-0"></div>
         </div>
 
         <!-- ВЬЮ: ПИТАНИЕ -->
@@ -119,7 +147,6 @@
         <!-- ВЬЮ: АНАЛИТИКА -->
         <div id="view-analytics" class="space-y-4 hidden">
             <h3 class="text-2xl font-black mb-4">Аналитика</h3>
-            
             <div class="card">
                 <div class="flex justify-between items-center cursor-pointer" onclick="toggleCalendar()">
                     <div class="flex items-center gap-2">
@@ -146,17 +173,9 @@
                 <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тоннаж (7 дн)</p><h4 id="statTonnage" class="text-3xl font-black text-green-500 tabular-nums">0<span class="text-sm">т</span></h4></div>
             </div>
             
-            <div class="card">
-                <h4 class="font-black text-sm mb-4">Макронутриенты (7 дней)</h4>
-                <div class="h-48 relative w-full"><canvas id="chartCals"></canvas></div>
-            </div>
-            
-            <div class="card">
-                <h4 class="font-black text-sm mb-4">БЖУК (Среднее за 7 дней)</h4>
-                <div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div>
-            </div>
+            <div class="card"><h4 class="font-black text-sm mb-4">Макронутриенты (7 дней)</h4><div class="h-48 relative w-full"><canvas id="chartCals"></canvas></div></div>
+            <div class="card"><h4 class="font-black text-sm mb-4">БЖУК (Среднее за 7 дней)</h4><div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div></div>
 
-            <!-- ГРАФИК ПРОГРЕССА УПРАЖНЕНИЙ (ВОССТАНОВЛЕН) -->
             <div class="card">
                 <div class="flex justify-between items-center mb-4">
                     <h4 class="font-black text-sm">Прогресс упражнений</h4>
@@ -215,21 +234,15 @@
         </div>
     </div>
 
-    <!-- МОДАЛКА: ДОБАВИТЬ УПРАЖНЕНИЕ -->
+    <!-- МОДАЛКА: ДОБАВИТЬ УПРАЖНЕНИЕ (ТЕПЕРЬ ТОЛЬКО ПОИСК) -->
     <div id="exModal" class="modal-overlay" onclick="if(event.target===this) closeModal('exModal')">
-        <div class="modal-content">
+        <div class="modal-content" style="height: 80vh;">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-black">Упражнение</h3>
                 <button onclick="closeModal('exModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <input type="text" id="exSearch" placeholder="Поиск упражнения..." class="custom-input mb-2" oninput="filterEx()">
-            <div id="exSearchResults" class="max-h-40 overflow-y-auto mb-4 space-y-1"></div>
-            
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div><p id="exInput1Label" class="text-[10px] font-bold text-slate-400 uppercase mb-1">Вес (кг)</p><input type="number" id="exWeight" class="custom-input text-center" placeholder="0"></div>
-                <div><p id="exInput2Label" class="text-[10px] font-bold text-slate-400 uppercase mb-1">Повторы</p><input type="number" id="exReps" class="custom-input text-center" placeholder="0"></div>
-            </div>
-            <button onclick="confirmAddEx()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Добавить упражнение</button>
+            <input type="text" id="exSearch" placeholder="Поиск упражнения..." class="custom-input mb-4" oninput="filterEx()">
+            <div id="exSearchResults" class="overflow-y-auto space-y-1 pb-20"></div>
         </div>
     </div>
 
@@ -290,28 +303,6 @@
                 <div class="text-center"><p class="text-[10px] font-bold text-yellow-500 uppercase mb-1">Клетч</p><input type="number" id="goalFib" class="custom-input text-center px-1"></div>
             </div>
             <button onclick="saveGoals()" class="w-full bg-blue-500 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Сохранить цели</button>
-        </div>
-    </div>
-
-    <!-- МОДАЛКИ ШАБЛОНОВ -->
-    <div id="saveTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('saveTplModal')">
-        <div class="modal-content">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-black">Сохранить как шаблон</h3>
-                <button onclick="closeModal('saveTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <input type="text" id="tplNameInput" placeholder="Название шаблона (напр. День Ног)" class="custom-input mb-6">
-            <button onclick="confirmSaveTemplate()" class="w-full bg-slate-900 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg">Сохранить</button>
-        </div>
-    </div>
-
-    <div id="loadTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('loadTplModal')">
-        <div class="modal-content">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-black">Мои шаблоны</h3>
-                <button onclick="closeModal('loadTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div id="tplList" class="space-y-2 max-h-60 overflow-y-auto"></div>
         </div>
     </div>
 
