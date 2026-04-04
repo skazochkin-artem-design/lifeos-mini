@@ -9,7 +9,15 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = id => document.getElementById(id);
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-function haptic(style = 'light') { try { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style); } catch(e){} }
+
+// ИСПРАВЛЕНО: Безопасный вызов Haptic Feedback (не ломает код на ПК)
+function haptic(style = 'light') { 
+    try { 
+        if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback && window.Telegram.WebApp.isVersionAtLeast('6.1')) {
+            window.Telegram.WebApp.HapticFeedback.impactOccurred(style); 
+        } 
+    } catch(e){} 
+}
 
 function setSyncStatus(status) {
     const el = $('syncStatus');
@@ -20,7 +28,7 @@ function setSyncStatus(status) {
     else el.innerHTML = '<i class="fa-solid fa-cloud text-slate-300"></i>';
 }
 
-const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Сведение рук в кроссовере","Пуловер","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Сведение ног в тренажере","Разведение ног в тренажере","Гакк-присед","Приседания в Смите","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Тяга нижнего блока","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Тяга Т-грифа","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Обратные разводки (задняя дельта)","Жим сидя в Смите","Подъем на бицепс (штанга)","Подъем гантелей на бицепс","Молотки","Концентрированный подъем","Сгибания на нижнем блоке","Французский жим","Разгибания на блоке","Разгибания из-за головы","Отжимания узким хватом","Планка","Скручивания","Подъем ног в висе","Русский твист","Молитва (пресс)","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи","Степпер","Ходьба"].sort();
+const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Сведение рук в кроссовере","Пуловер","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Сведение ног в тренажере","Разведение ног в тренажере","Гакк-присед","Приседания в Смите","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Тяга нижнего блока","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Тяга Т-грифа","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Обратные разводки (задняя дельта)","Жим сидя в Смите","Подъем на бицепс (штанга)","Подъем гантелей на бицепс","Молотки","Концентрированный подъем","Сгибания на нижнем блоке","Французский жим","Разгибания на блоке","Разгибания из-за головы","Отжимания узким хватом","Планка","Скручивания","Подъем ног в висе","Русский твист","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи","Степпер","Ходьба"].sort();
 const CARDIO_LIST =['бег', 'эллипс', 'велотренажер', 'гребля', 'скакалка', 'берпи', 'ходьба', 'степпер'];
 
 const FOOD_DB =[
@@ -62,7 +70,7 @@ let currentMealForAdd = '';
 let isSupersetMode = false;
 let selectedForSuperset =[];
 
-// --- МИГРАЦИЯ ДАННЫХ (Плоский массив -> Объекты упражнений) ---
+// --- МИГРАЦИЯ ДАННЫХ ---
 function migrateData() {
     let migrated = false;
     Object.keys(sportData).forEach(date => {
@@ -85,39 +93,55 @@ function migrateData() {
     if(migrated) { console.log("Data migrated to new format"); save(); }
 }
 
-// --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE ---
+// --- ИСПРАВЛЕНО: ОБЛАЧНЫЕ СОХРАНЕНИЯ (БЕЗ БЛОКИРОВКИ) ---
 async function initData() {
     setSyncStatus('loading');
-    try { sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {}; } catch(e) { sportData = {}; }
+    try { 
+        sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {}; 
+    } catch(e) { 
+        sportData = {}; 
+        console.warn('LocalStorage недоступен при загрузке');
+    }
+    
+    if(!sportData._templates) sportData._templates = [];
+    if(!sportData._mealTemplates) sportData._mealTemplates =[];
     
     migrateData(); 
     render(); 
     
-    const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
-    try {
-        let { data, error } = await supabaseClient.from('user_data').select('data').eq('telegram_id', tgUser.id).single();
-        if (data && data.data) {
-            sportData = data.data;
-            migrateData(); 
-            localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
-            render(); setSyncStatus('success');
-        } else setSyncStatus('idle');
-    } catch (err) { setSyncStatus('error'); }
+    if (typeof supabaseClient !== 'undefined') {
+        const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
+        try {
+            let { data, error } = await supabaseClient.from('user_data').select('data').eq('telegram_id', tgUser.id).single();
+            if (data && data.data) {
+                sportData = data.data;
+                migrateData(); 
+                try { localStorage.setItem('tma_sport_data', JSON.stringify(sportData)); } catch(e){}
+                render(); 
+                setSyncStatus('success');
+            } else setSyncStatus('idle');
+        } catch (err) { setSyncStatus('error'); }
+    }
 }
 
 function save() {
+    // 1. Пытаемся сохранить локально
     try {
         localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
-        setTimeout(() => {
-            setSyncStatus('loading');
-            const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
-            if (typeof supabaseClient !== 'undefined') {
-                supabaseClient.from('user_data').upsert({ telegram_id: tgUser.id, data: sportData, updated_at: new Date() })
-                    .then(() => setSyncStatus('success'))
-                    .catch(() => setSyncStatus('error'));
-            }
-        }, 10);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+        console.warn('LocalStorage недоступен:', e);
+    }
+    
+    // 2. В ЛЮБОМ СЛУЧАЕ сохраняем в облако (в фоне)
+    setTimeout(() => {
+        setSyncStatus('loading');
+        const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
+        if (typeof supabaseClient !== 'undefined') {
+            supabaseClient.from('user_data').upsert({ telegram_id: tgUser.id, data: sportData, updated_at: new Date() })
+                .then(() => setSyncStatus('success'))
+                .catch(() => setSyncStatus('error'));
+        }
+    }, 10);
 }
 
 // --- НАВИГАЦИЯ И ДАТА ---
@@ -201,7 +225,9 @@ function renderSport(dk) {
                                 </div>
                                 <div class="relative">
                                     <button onclick="toggleSetMenu('${s.id}')" class="text-slate-400 hover:text-slate-600 p-2"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-                                    <div id="menu-${s.id}" class="hidden absolute right-0 top-full mt-1 bg-white shadow-xl rounded-xl border border-slate-100 z-20 w-32 overflow-hidden">
+                                    <!-- ИСПРАВЛЕНО: Оверлей для мобилок -->
+                                    <div id="overlay-${s.id}" class="hidden fixed inset-0 z-40" onclick="toggleSetMenu('${s.id}')"></div>
+                                    <div id="menu-${s.id}" class="hidden absolute right-0 top-full mt-1 bg-white shadow-2xl rounded-xl border border-slate-100 z-50 w-32 overflow-hidden">
                                         <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-purple-600 hover:bg-purple-50">Дропсет</button>
                                         <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">Удалить</button>
                                     </div>
@@ -287,15 +313,26 @@ function addSet(exId) {
     save(); render(); setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
 }
 
+// ИСПРАВЛЕНО: Удаление подхода
 function deleteSet(exId, setId) {
     haptic('medium'); const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId);
     ex.sets = ex.sets.filter(s => s.id !== setId); save(); render(); setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
 }
 
+// ИСПРАВЛЕНО: Меню подхода (Оверлей для мобилок)
 function toggleSetMenu(setId) {
-    const menu = $(`menu-${setId}`); menu.classList.toggle('hidden');
-    const closeMenu = (e) => { if(!e.target.closest('.relative')) { menu.classList.add('hidden'); document.removeEventListener('click', closeMenu); } };
-    setTimeout(() => document.addEventListener('click', closeMenu), 10);
+    haptic('light');
+    const menu = $(`menu-${setId}`);
+    const overlay = $(`overlay-${setId}`);
+    const isHidden = menu.classList.contains('hidden');
+    
+    document.querySelectorAll('[id^="menu-s_"]').forEach(m => m.classList.add('hidden'));
+    document.querySelectorAll('[id^="overlay-s_"]').forEach(o => o.classList.add('hidden'));
+    
+    if (isHidden) {
+        menu.classList.remove('hidden');
+        if(overlay) overlay.classList.remove('hidden');
+    }
 }
 
 function makeDropSet(exId, setId) {
@@ -474,7 +511,12 @@ function renderNutrition(dk) {
     }).join('');
 }
 
-function addWater(amount) { haptic('light'); const dk = iso(pivotDate); sportData[dk].water = Math.max(0, (sportData[dk].water || 0) + amount); save(); render(); }
+function addWater(amount) { 
+    haptic('light'); 
+    const dk = iso(pivotDate); 
+    sportData[dk].water = Math.max(0, (sportData[dk].water || 0) + amount); 
+    save(); render(); 
+}
 
 function openGoalModal() {
     haptic('light');
@@ -600,14 +642,14 @@ function confirmAddFood() {
 
 function deleteFood(idx) { haptic('medium'); sportData[iso(pivotDate)].food.splice(idx, 1); save(); render(); }
 
-// --- СКАНЕР ШТРИХ-КОДОВ ---
+// ИСПРАВЛЕНО: Сканер штрих-кодов (Добавлена кнопка закрытия и ручной ввод)
 let isScanning = false;
 function scanBarcode() {
     haptic('heavy');
     const container = $('scanner-container');
     
     if (isScanning) {
-        Quagga.stop(); isScanning = false; container.style.display = 'none'; return;
+        stopScanner(); return;
     }
     
     container.style.display = 'block';
@@ -617,16 +659,24 @@ function scanBarcode() {
         inputStream: { name: "Live", type: "LiveStream", target: container },
         decoder: { readers:["ean_reader", "ean_8_reader"] }
     }, function(err) {
-        if (err) { alert('Ошибка камеры'); container.style.display = 'none'; isScanning = false; return; }
+        if (err) { alert('Ошибка камеры'); stopScanner(); return; }
         Quagga.start();
     });
     
     Quagga.onDetected(function(result) {
         if(!isScanning) return;
         const code = result.codeResult.code;
-        Quagga.stop(); isScanning = false; container.style.display = 'none';
+        stopScanner();
         fetchProductByCode(code);
     });
+}
+
+function stopScanner() {
+    if (isScanning) {
+        Quagga.stop(); 
+        isScanning = false; 
+        $('scanner-container').style.display = 'none'; 
+    }
 }
 
 async function fetchProductByCode(code) {
