@@ -8,7 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- ПУНКТ 2: Подключаем библиотеку для сканера штрих-кодов -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800;900&display=swap" rel="stylesheet">
@@ -36,11 +35,12 @@
         .water-card { overflow: hidden; z-index: 1; }
         #waterFill { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(59, 130, 246, 0.15); z-index: -1; transition: height 0.5s ease-in-out; }
         
-        /* Стили для сканера */
         #scanner-container { width: 100%; height: 200px; overflow: hidden; border-radius: 12px; margin-bottom: 10px; background: #000; display: none; position: relative; }
         #scanner-container video { width: 100%; height: 100%; object-fit: cover; }
-        .scan-line { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: red; box-shadow: 0 0 10px red; animation: scan 2s infinite linear; }
+        .scan-line { position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: red; box-shadow: 0 0 10px red; animation: scan 2s infinite linear; z-index: 10; }
         @keyframes scan { 0% { top: 10%; } 50% { top: 90%; } 100% { top: 10%; } }
+        
+        .food-img-thumb { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -95,7 +95,6 @@
                     <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-blue-200">Углеводы</p><p class="font-black text-sm" id="cVal">0/300</p></div>
                     <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-yellow-200">Клетчатка</p><p class="font-black text-sm" id="fibVal">0/30</p></div>
                 </div>
-                <!-- ПУНКТ 3: Глобальный прогресс-бар БЖУК -->
                 <div id="globalMacroBar" class="flex h-1.5 w-full rounded-full overflow-hidden mt-3 opacity-80"></div>
             </div>
 
@@ -121,7 +120,6 @@
         <div id="view-analytics" class="space-y-4 hidden">
             <h3 class="text-2xl font-black mb-4">Аналитика</h3>
             
-            <!-- ПУНКТ 4: Свернутый календарь -->
             <div class="card">
                 <div class="flex justify-between items-center cursor-pointer" onclick="toggleCalendar()">
                     <div class="flex items-center gap-2">
@@ -148,10 +146,25 @@
                 <div class="card m-0 text-center py-4"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тоннаж (7 дн)</p><h4 id="statTonnage" class="text-3xl font-black text-green-500 tabular-nums">0<span class="text-sm">т</span></h4></div>
             </div>
             
-            <!-- ПУНКТ 5: График БЖУК за 7 дней -->
             <div class="card">
                 <h4 class="font-black text-sm mb-4">Макронутриенты (7 дней)</h4>
-                <div class="h-48 relative w-full"><canvas id="chartMacrosHistory"></canvas></div>
+                <div class="h-48 relative w-full"><canvas id="chartCals"></canvas></div>
+            </div>
+            
+            <div class="card">
+                <h4 class="font-black text-sm mb-4">БЖУК (Среднее за 7 дней)</h4>
+                <div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div>
+            </div>
+
+            <!-- ГРАФИК ПРОГРЕССА УПРАЖНЕНИЙ (ВОССТАНОВЛЕН) -->
+            <div class="card">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="font-black text-sm">Прогресс упражнений</h4>
+                </div>
+                <select id="analyticsExSelect" onchange="renderExProgressChart()" class="custom-input mb-4 text-xs py-2">
+                    <option value="">Выберите упражнение...</option>
+                </select>
+                <div class="h-40 relative w-full"><canvas id="chartExProgress"></canvas></div>
             </div>
         </div>
 
@@ -231,11 +244,11 @@
             
             <div class="flex gap-2 mb-2">
                 <input type="text" id="foodSearch" placeholder="Поиск продукта..." class="custom-input flex-1" oninput="filterFood()">
-                <button onclick="toggleScanner()" class="w-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg"><i class="fa-solid fa-barcode"></i></button>
+                <button onclick="scanBarcode()" class="w-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shadow-lg"><i class="fa-solid fa-barcode"></i></button>
             </div>
             
-            <!-- ПУНКТ 2: Контейнер для камеры сканера -->
             <div id="scanner-container">
+                <video autoplay muted playsinline></video>
                 <div class="scan-line"></div>
             </div>
             
