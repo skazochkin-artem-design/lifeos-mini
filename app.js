@@ -9,15 +9,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = id => document.getElementById(id);
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-// Безопасный вызов Haptic Feedback (не ломает код на ПК)
-function haptic(style = 'light') { 
-    try {
-        if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-            window.Telegram.WebApp.HapticFeedback.impactOccurred(style); 
-        }
-    } catch(e) {} 
-}
+function haptic(style = 'light') { try { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style); } catch(e){} }
 
 function setSyncStatus(status) {
     const el = $('syncStatus');
@@ -28,7 +20,7 @@ function setSyncStatus(status) {
     else el.innerHTML = '<i class="fa-solid fa-cloud text-slate-300"></i>';
 }
 
-const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Подъем на бицепс (штанга)","Молотки","Концентрированный подъем","Французский жим","Разгибания на блоке","Планка","Скручивания","Подъем ног в висе","Русский твист","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи"].sort();
+const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Сведение рук в кроссовере","Пуловер","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Сведение ног в тренажере","Разведение ног в тренажере","Гакк-присед","Приседания в Смите","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Тяга нижнего блока","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Тяга Т-грифа","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Обратные разводки (задняя дельта)","Жим сидя в Смите","Подъем на бицепс (штанга)","Подъем гантелей на бицепс","Молотки","Концентрированный подъем","Сгибания на нижнем блоке","Французский жим","Разгибания на блоке","Разгибания из-за головы","Отжимания узким хватом","Планка","Скручивания","Подъем ног в висе","Русский твист","Молитва (пресс)","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи","Степпер","Ходьба"].sort();
 const CARDIO_LIST =['бег', 'эллипс', 'велотренажер', 'гребля', 'скакалка', 'берпи', 'ходьба', 'степпер'];
 
 const FOOD_DB =[
@@ -38,8 +30,15 @@ const FOOD_DB =[
     {n:"Макароны тв. сортов", c:350, p:12, f:1, u:70, fib: 3},
     {n:"Куриная грудка (сырая)", c:113, p:23, f:2, u:0, fib: 0},
     {n:"Говядина постная", c:180, p:20, f:10, u:0, fib: 0},
+    {n:"Индейка филе", c:115, p:24, f:1, u:0, fib: 0},
+    {n:"Лосось (свежий)", c:208, p:20, f:13, u:0, fib: 0},
+    {n:"Тунец консервированный", c:116, p:26, f:1, u:0, fib: 0},
     {n:"Яйцо (1шт)", c:70, p:6, f:5, u:0, fib: 0}, 
     {n:"Творог 5%", c:121, p:17, f:5, u:2, fib: 0},
+    {n:"Творог 9%", c:159, p:16, f:9, u:2, fib: 0},
+    {n:"Кефир 1%", c:40, p:3, f:1, u:4, fib: 0},
+    {n:"Сыр твердый (Пармезан)", c:431, p:38, f:29, u:4, fib: 0},
+    {n:"Сыр полутвердый (Российский)", c:360, p:24, f:29, u:0, fib: 0},
     {n:"Банан (1шт)", c:105, p:1, f:0, u:27, fib: 3},
     {n:"Яблоко (1шт)", c:95, p:0, f:0, u:25, fib: 4},
     {n:"Огурец", c:15, p:1, f:0, u:3, fib: 1},
@@ -48,6 +47,7 @@ const FOOD_DB =[
     {n:"Протеин (скуп 30г)", c:120, p:24, f:1, u:3, fib: 0}
 ];
 
+// --- СОСТОЯНИЕ ---
 let pivotDate = new Date();
 let currentTab = 'sport';
 let userGoals = JSON.parse(localStorage.getItem('tma_user_goals')) || { c: 2500, p: 160, f: 70, u: 300, fib: 30, water: 2000 };
@@ -56,26 +56,49 @@ let charts = {};
 let calPivot = new Date();
 
 let selectedFoodBase = null;
-let isCardioSelected = false;
 let currentTplType = 'workout'; 
 let currentMealForAdd = '';
+let isSupersetMode = false;
+let selectedForSuperset =[];
+
+// --- МИГРАЦИЯ ДАННЫХ (Плоский массив -> Объекты упражнений) ---
+function migrateData() {
+    let migrated = false;
+    Object.keys(sportData).forEach(date => {
+        if (sportData[date].workout && sportData[date].workout.length > 0) {
+            // Если первый элемент не имеет поля sets, значит это старый формат
+            if (!sportData[date].workout[0].sets) {
+                let newWorkout = [];
+                let currentEx = null;
+                sportData[date].workout.forEach(w => {
+                    if (!currentEx || currentEx.name !== w.n) {
+                        currentEx = { id: Date.now()+Math.random(), name: w.n, sets:[], note: w.notes || '', supersetId: null };
+                        newWorkout.push(currentEx);
+                    }
+                    currentEx.sets.push({ id: Date.now()+Math.random(), w: w.w, r: w.r, done: true, isDrop: false, drops: [] });
+                });
+                sportData[date].workout = newWorkout;
+                migrated = true;
+            }
+        }
+    });
+    if(migrated) { console.log("Data migrated to new format"); save(); }
+}
 
 // --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE ---
 async function initData() {
     setSyncStatus('loading');
     try { sportData = JSON.parse(localStorage.getItem('tma_sport_data')) || {}; } catch(e) { sportData = {}; }
     
-    if(!sportData._templates) sportData._templates =[];
-    if(!sportData._mealTemplates) sportData._mealTemplates =[];
-    
+    migrateData(); // Запускаем миграцию перед рендером
     render(); 
+    
     const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
     try {
         let { data, error } = await supabaseClient.from('user_data').select('data').eq('telegram_id', tgUser.id).single();
         if (data && data.data) {
             sportData = data.data;
-            if(!sportData._templates) sportData._templates =[];
-            if(!sportData._mealTemplates) sportData._mealTemplates =[];
+            migrateData(); // На всякий случай мигрируем и облачные данные
             localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
             render(); setSyncStatus('success');
         } else setSyncStatus('idle');
@@ -85,7 +108,6 @@ async function initData() {
 function save() {
     try {
         localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
-        // Фоновая отправка, не блокирует UI
         setTimeout(() => {
             setSyncStatus('loading');
             const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
@@ -103,9 +125,7 @@ function switchTab(tab, index) {
     haptic('light');
     currentTab = tab;
     const slider = $('nav-slider');
-    if(slider && index !== undefined) slider.style.transform = `translateX(${index * 100}%)`;
-
-    ['sport', 'nutrition', 'analytics'].forEach(t => {
+    if(slider && index !== undefined) slider.style.transform = `translateX(${index * 100}%)`;['sport', 'nutrition', 'analytics'].forEach(t => {
         const btn = $(`tab-${t}`); const view = $(`view-${t}`);
         if(btn) btn.classList.toggle('active', tab === t);
         if(view) view.classList.toggle('hidden', tab !== t);
@@ -130,7 +150,7 @@ function render() {
     if (currentTab === 'analytics') renderAnalytics();
 }
 
-// === МОДУЛЬ СПОРТА ===
+// === МОДУЛЬ СПОРТА (НОВЫЙ UI) ===
 function renderSport(dk) {
     const list = $('workoutList');
     const workout = sportData[dk].workout;
@@ -140,47 +160,279 @@ function renderSport(dk) {
         return;
     }
 
-    const groups =[];
-    workout.forEach((w, i) => {
-        const last = groups[groups.length - 1];
-        if (last && last.name === w.n) last.sets.push({...w, idx: i});
-        else groups.push({ name: w.n, sets:[{...w, idx: i}] });
-    });
+    // Цвета для суперсетов
+    const ssColors =['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#a855f7'];
+    let ssColorMap = {};
+    let ssCounter = 0;
 
-    list.innerHTML = groups.map(g => {
-        const isCardio = CARDIO_LIST.some(c => g.name.toLowerCase().includes(c));
+    list.innerHTML = workout.map((ex, exIdx) => {
+        const isCardio = CARDIO_LIST.some(c => ex.name.toLowerCase().includes(c));
         const label1 = isCardio ? 'мин' : 'кг';
         const label2 = isCardio ? 'ур' : '×';
+        
+        // Логика суперсетов
+        let ssLine = '';
+        let ssClass = '';
+        if (ex.supersetId) {
+            if (!ssColorMap[ex.supersetId]) { ssColorMap[ex.supersetId] = ssColors[ssCounter % ssColors.length]; ssCounter++; }
+            ssLine = `<div class="superset-line" style="background-color: ${ssColorMap[ex.supersetId]}"></div>`;
+            ssClass = 'superset-linked pl-6';
+        }
+
+        // Сводка (свернутый вид)
+        const summaryHtml = ex.sets.map(s => {
+            const val = `${s.w||0}${label1} ${label2} ${s.r||0}`;
+            return `<span class="${s.done ? 'done' : ''}">${val}</span>`;
+        }).join(', ');
+
+        // Развернутый вид
+        const expandedHtml = `
+            <div id="ex-body-${ex.id}" class="mt-3 hidden">
+                ${ex.note !== undefined ? `
+                    <div class="mb-3 flex gap-2">
+                        <input type="text" value="${ex.note}" onchange="updateExNote('${ex.id}', this.value)" placeholder="Заметка к упражнению..." class="custom-input text-xs py-2 flex-1">
+                    </div>
+                ` : ''}
+                <div class="space-y-1">
+                    ${ex.sets.map((s, sIdx) => `
+                        <div>
+                            <div class="set-row ${!s.done ? 'set-ghost' : ''}">
+                                <div class="check-btn ${s.done ? 'done' : ''}" onclick="toggleSetDone('${ex.id}', '${s.id}')">
+                                    ${s.done ? '<i class="fa-solid fa-check text-xs"></i>' : '<span class="text-xs font-bold">'+(sIdx+1)+'</span>'}
+                                </div>
+                                <input type="number" value="${s.w}" onchange="updateSetVal('${ex.id}', '${s.id}', 'w', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Время' : 'Вес'}">
+                                <span class="text-xs text-slate-400">${label1}</span>
+                                <span class="text-slate-300 mx-1">${isCardio ? '|' : label2}</span>
+                                <input type="number" value="${s.r}" onchange="updateSetVal('${ex.id}', '${s.id}', 'r', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Уровень' : 'Повт'}">
+                                
+                                <div class="relative ml-2">
+                                    <button onclick="toggleSetMenu('${s.id}')" class="text-slate-400 hover:text-slate-600 px-2"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                    <div id="menu-${s.id}" class="hidden absolute right-0 top-full mt-1 bg-white shadow-lg rounded-xl border border-slate-100 z-20 w-32 overflow-hidden">
+                                        <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-2 text-xs font-bold text-purple-600 hover:bg-purple-50">Дропсет</button>
+                                        <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50">Удалить</button>
+                                    </div>
+                                </div>
+                            </div>
+                            ${s.isDrop ? `
+                                <div class="pl-8 space-y-1 mt-1 mb-2 border-l-2 border-purple-200 ml-3">
+                                    ${s.drops.map((d, dIdx) => `
+                                        <div class="flex items-center gap-2 bg-purple-50/50 p-1.5 rounded-lg">
+                                            <i class="fa-solid fa-arrow-turn-down text-[10px] text-purple-300"></i>
+                                            <input type="number" value="${d.w}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'w', this.value)" class="set-input w-12 text-sm bg-white" placeholder="Вес">
+                                            <span class="text-[10px] text-slate-400">×</span>
+                                            <input type="number" value="${d.r}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'r', this.value)" class="set-input w-12 text-sm bg-white" placeholder="Повт">
+                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="text-slate-300 hover:text-red-500 ml-auto px-2"><i class="fa-solid fa-xmark text-[10px]"></i></button>
+                                        </div>
+                                    `).join('')}
+                                    <button onclick="addDrop('${ex.id}', '${s.id}')" class="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-1 rounded-md mt-1">+ Сброс веса</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="flex gap-2 mt-3">
+                    <button onclick="addSet('${ex.id}')" class="flex-1 bg-slate-100 text-slate-600 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition">+ Подход</button>
+                </div>
+            </div>
+        `;
 
         return `
-        <div class="card">
-            <div class="flex justify-between items-center mb-4">
-                <h4 class="font-black text-lg">${g.name}</h4>
-                <button onclick="addSet('${g.name}')" class="text-blue-500 text-sm font-bold bg-blue-50 px-3 py-1 rounded-lg">+ Подход</button>
-            </div>
-            <div class="space-y-2">
-                ${g.sets.map((s, i) => `
-                    <div class="set-row">
-                        <span class="text-xs font-bold text-slate-400 w-4">${i+1}</span>
-                        <input type="number" value="${s.w}" onchange="updateSet(${s.idx}, 'w', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Время' : 'Вес'}">
-                        <span class="text-xs text-slate-400">${label1}</span>
-                        <span class="text-slate-300 mx-1">${isCardio ? '|' : label2}</span>
-                        <input type="number" value="${s.r}" onchange="updateSet(${s.idx}, 'r', this.value)" class="set-input flex-1" placeholder="${isCardio ? 'Уровень' : 'Повт'}">
-                        <button onclick="deleteSet(${s.idx})" class="text-slate-300 hover:text-red-500 ml-2"><i class="fa-solid fa-xmark"></i></button>
+        <div class="ex-card ${ssClass}">
+            ${ssLine}
+            ${isSupersetMode ? `<input type="checkbox" class="absolute right-4 top-4 w-5 h-5 accent-blue-500 z-10" onchange="toggleSupersetSelection('${ex.id}', this.checked)">` : ''}
+            
+            <div class="flex justify-between items-start cursor-pointer" onclick="toggleExExpand('${ex.id}')">
+                <div class="flex-1 pr-8">
+                    <div class="flex items-center gap-2">
+                        <h4 class="font-black text-slate-800">${ex.name}</h4>
+                        ${ex.note ? '<i class="fa-regular fa-comment-dots text-blue-400 text-xs"></i>' : ''}
                     </div>
-                `).join('')}
+                    <div class="ex-summary mt-1" id="ex-sum-${ex.id}">${summaryHtml || 'Нет подходов'}</div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="event.stopPropagation(); toggleNote('${ex.id}')" class="text-slate-300 hover:text-blue-500"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="text-slate-300 hover:text-red-500"><i class="fa-solid fa-trash"></i></button>
+                </div>
             </div>
+            ${expandedHtml}
         </div>
-    `}).join('');
+        `;
+    }).join('');
 }
 
+// --- ЛОГИКА УПРАЖНЕНИЙ ---
+function toggleExExpand(id) {
+    const body = $(`ex-body-${id}`);
+    const sum = $(`ex-sum-${id}`);
+    if(body.classList.contains('hidden')) {
+        body.classList.remove('hidden');
+        sum.classList.add('hidden');
+    } else {
+        body.classList.add('hidden');
+        sum.classList.remove('hidden');
+    }
+}
+
+function toggleNote(id) {
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === id);
+    if(ex.note === undefined) ex.note = '';
+    save(); render();
+    // Автоматически разворачиваем
+    const body = $(`ex-body-${id}`);
+    if(body && body.classList.contains('hidden')) toggleExExpand(id);
+}
+
+function updateExNote(id, val) {
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === id);
+    if(ex) { ex.note = val; save(); }
+}
+
+function deleteExercise(id) {
+    if(confirm('Удалить упражнение?')) {
+        const dk = iso(pivotDate);
+        sportData[dk].workout = sportData[dk].workout.filter(w => w.id !== id);
+        save(); render();
+    }
+}
+
+// --- ЛОГИКА ПОДХОДОВ ---
+function toggleSetDone(exId, setId) {
+    haptic('light');
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId);
+    set.done = !set.done;
+    save(); render();
+}
+
+function updateSetVal(exId, setId, field, val) {
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId);
+    set[field] = val;
+    set.done = true; // Автоматически отмечаем как выполненный при вводе
+    save();
+}
+
+function addSet(exId) {
+    haptic('light');
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    const lastSet = ex.sets[ex.sets.length - 1];
+    ex.sets.push({ id: Date.now()+Math.random(), w: lastSet?.w||'', r: lastSet?.r||'', done: false, isDrop: false, drops:[] });
+    save(); render();
+    // Оставляем развернутым
+    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+}
+
+function deleteSet(exId, setId) {
+    haptic('medium');
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    ex.sets = ex.sets.filter(s => s.id !== setId);
+    save(); render();
+    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+}
+
+function toggleSetMenu(setId) {
+    const menu = $(`menu-${setId}`);
+    menu.classList.toggle('hidden');
+    // Закрываем по клику вне
+    const closeMenu = (e) => { if(!e.target.closest('.relative')) { menu.classList.add('hidden'); document.removeEventListener('click', closeMenu); } };
+    setTimeout(() => document.addEventListener('click', closeMenu), 10);
+}
+
+// --- ЛОГИКА ДРОПСЕТОВ ---
+function makeDropSet(exId, setId) {
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId);
+    set.isDrop = true;
+    if(!set.drops) set.drops =[];
+    set.drops.push({ w: '', r: '' }); // Добавляем первую ступень
+    save(); render();
+    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+}
+
+function addDrop(exId, setId) {
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId);
+    set.drops.push({ w: '', r: '' });
+    save(); render();
+    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+}
+
+function updateDropVal(exId, setId, dropIdx, field, val) {
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId);
+    set.drops[dropIdx][field] = val;
+    set.done = true;
+    save();
+}
+
+function deleteDrop(exId, setId, dropIdx) {
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === exId);
+    const set = ex.sets.find(s => s.id === setId);
+    set.drops.splice(dropIdx, 1);
+    if(set.drops.length === 0) set.isDrop = false; // Если удалили все дропы, это обычный подход
+    save(); render();
+    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+}
+
+// --- ЛОГИКА СУПЕРСЕТОВ ---
+function toggleSupersetMode() {
+    isSupersetMode = !isSupersetMode;
+    selectedForSuperset =[];
+    $('btnSuperset').classList.toggle('bg-blue-500', isSupersetMode);
+    $('btnSuperset').classList.toggle('text-white', isSupersetMode);
+    $('supersetPanel').classList.toggle('hidden', !isSupersetMode);
+    render();
+}
+
+function toggleSupersetSelection(id, isChecked) {
+    if(isChecked) selectedForSuperset.push(id);
+    else selectedForSuperset = selectedForSuperset.filter(x => x !== id);
+}
+
+function cancelSuperset() {
+    isSupersetMode = false;
+    selectedForSuperset =[];
+    $('btnSuperset').classList.remove('bg-blue-500', 'text-white');
+    $('supersetPanel').classList.add('hidden');
+    render();
+}
+
+function confirmSuperset() {
+    if(selectedForSuperset.length < 2) return alert('Выберите минимум 2 упражнения!');
+    const dk = iso(pivotDate);
+    const ssId = 'ss_' + Date.now();
+    
+    // Присваиваем ID суперсета выбранным упражнениям
+    sportData[dk].workout.forEach(w => {
+        if(selectedForSuperset.includes(w.id)) w.supersetId = ssId;
+    });
+    
+    // Сортируем массив, чтобы упражнения суперсета шли друг за другом
+    sportData[dk].workout.sort((a, b) => {
+        if(a.supersetId === ssId && b.supersetId !== ssId) return -1;
+        if(a.supersetId !== ssId && b.supersetId === ssId) return 1;
+        return 0;
+    });
+
+    save();
+    cancelSuperset(); // Выключает режим и рендерит
+}
+
+// --- ДОБАВЛЕНИЕ УПРАЖНЕНИЯ (С АВТОЗАПОЛНЕНИЕМ) ---
 function openExModal() {
     haptic('light');
     $('exModal').style.display = 'flex';
-    $('exSearch').value = ''; $('exWeight').value = ''; $('exReps').value = '';
-    isCardioSelected = false;
-    $('exInput1Label').innerText = 'Вес (кг)';
-    $('exInput2Label').innerText = 'Повторы';
+    $('exSearch').value = '';
     filterEx();
 }
 
@@ -192,144 +444,47 @@ function filterEx() {
         const div = document.createElement('div');
         div.className = 'p-3 hover:bg-slate-50 rounded-xl font-bold text-sm cursor-pointer border-b border-slate-50';
         div.innerText = ex;
-        div.onclick = () => { 
-            $('exSearch').value = ex; 
-            res.innerHTML = ''; 
-            isCardioSelected = CARDIO_LIST.some(c => ex.toLowerCase().includes(c));
-            $('exInput1Label').innerText = isCardioSelected ? 'Время (мин)' : 'Вес (кг)';
-            $('exInput2Label').innerText = isCardioSelected ? 'Уровень / Наклон' : 'Повторы';
-        };
+        div.onclick = () => confirmAddEx(ex); // Сразу добавляем по клику
         res.appendChild(div);
     });
 }
 
-function confirmAddEx() {
-    try {
-        const name = $('exSearch').value;
-        if(!name) { alert('Введите название!'); return; }
-        const dk = iso(pivotDate);
-        const w = $('exWeight').value;
-        const r = $('exReps').value;
-        
-        const setsCount = isCardioSelected ? 1 : 3;
-        for(let i=0; i < setsCount; i++) sportData[dk].workout.push({ n: name, w: w, r: r });
-        
-        haptic('success');
-        save(); 
-        render(); 
-        closeModal('exModal');
-    } catch(e) { console.error(e); }
-}
-
-function addSet(name) {
-    haptic('light');
+function confirmAddEx(name) {
     const dk = iso(pivotDate);
-    const lastSet = [...sportData[dk].workout].reverse().find(w => w.n === name);
-    sportData[dk].workout.push({ n: name, w: lastSet?.w||'', r: lastSet?.r||'' });
-    save(); render();
-}
-
-function updateSet(idx, field, val) { sportData[iso(pivotDate)].workout[idx][field] = val; save(); }
-function deleteSet(idx) { haptic('medium'); sportData[iso(pivotDate)].workout.splice(idx, 1); save(); render(); }
-
-function shareWorkout() {
-    haptic('medium');
-    const dk = iso(pivotDate);
-    const day = sportData[dk];
-    if (!day || !day.workout || day.workout.length === 0) return alert('Нет тренировок для шеринга!');
-    let tonnage = 0;
-    day.workout.forEach(w => tonnage += (parseFloat(w.w)||0) * (parseFloat(w.r)||0));
-    const text = `🔥 Отличная тренировка!\nТоннаж: ${tonnage} кг\nПодходов: ${day.workout.length}`;
-    const url = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/your_bot_name/app')}&text=${encodeURIComponent(text)}`;
-    if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) {
-        window.Telegram.WebApp.openTelegramLink(url);
-    } else {
-        window.open(url, '_blank');
-    }
-}
-
-// === ШАБЛОНЫ ===
-function openSaveTplModal(type, mealType = '') {
-    haptic('light');
-    currentTplType = type; currentMealForAdd = mealType;
-    const dk = iso(pivotDate);
-    if(type === 'workout' && sportData[dk].workout.length === 0) return alert('Тренировка пуста!');
-    if(type === 'meal' && sportData[dk].food.filter(f => f.type === mealType).length === 0) return alert('Прием пищи пуст!');
-    $('tplNameInput').value = type === 'meal' ? mealType : '';
-    $('saveTplModal').style.display = 'flex';
-}
-
-function confirmSaveTemplate() {
-    const name = $('tplNameInput').value;
-    if(!name) return alert('Введите название!');
-    const dk = iso(pivotDate);
-    if(currentTplType === 'workout') {
-        sportData._templates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(sportData[dk].workout)) });
-    } else if(currentTplType === 'meal') {
-        const items = sportData[dk].food.filter(f => f.type === currentMealForAdd);
-        sportData._mealTemplates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(items)) });
-    }
-    haptic('success'); save(); closeModal('saveTplModal');
-}
-
-function openLoadTplModal(type, mealType = '') {
-    haptic('light');
-    currentTplType = type; currentMealForAdd = mealType;
-    const list = $('tplList'); list.innerHTML = '';
-    const tpls = type === 'workout' ? sportData._templates : sportData._mealTemplates;
     
-    if(!tpls || tpls.length === 0) {
-        list.innerHTML = '<p class="text-center text-slate-400 text-sm font-bold py-4">Нет сохраненных шаблонов</p>';
-    } else {
-        tpls.forEach(t => {
-            list.innerHTML += `
-            <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-2 cursor-pointer" onclick="applyTemplate(${t.id})">
-                <div><p class="font-bold text-sm text-slate-700">${t.name}</p><p class="text-[10px] text-slate-400 font-bold">${t.items.length} элементов</p></div>
-                <button onclick="event.stopPropagation(); deleteTemplate(${t.id})" class="text-slate-300 hover:text-red-500 px-2"><i class="fa-solid fa-trash"></i></button>
-            </div>`;
-        });
-    }
-    $('loadTplModal').style.display = 'flex';
-}
-
-function applyTemplate(id) {
-    const dk = iso(pivotDate);
-    if(currentTplType === 'workout') {
-        const t = sportData._templates.find(x => x.id === id);
-        if(t) sportData[dk].workout.push(...JSON.parse(JSON.stringify(t.items)));
-    } else if(currentTplType === 'meal') {
-        const t = sportData._mealTemplates.find(x => x.id === id);
-        if(t) {
-            const newItems = JSON.parse(JSON.stringify(t.items)).map(i => ({...i, type: currentMealForAdd}));
-            sportData[dk].food.push(...newItems);
+    // Ищем прошлые результаты для автозаполнения (Ghost Sets)
+    let pastSets =[];
+    const dates = Object.keys(sportData).sort().reverse();
+    for (let d of dates) {
+        if (d >= dk) continue; // Ищем только в прошлом
+        const pastEx = sportData[d].workout?.find(w => w.name === name);
+        if (pastEx && pastEx.sets.length > 0) {
+            // Копируем подходы, но делаем их "призрачными" (done: false)
+            pastSets = pastEx.sets.map(s => ({
+                id: Date.now() + Math.random(),
+                w: s.w, r: s.r,
+                done: false, // ВАЖНО: они серые, пока юзер не подтвердит
+                isDrop: s.isDrop || false,
+                drops: s.drops ? JSON.parse(JSON.stringify(s.drops)) :[]
+            }));
+            break;
         }
     }
-    haptic('success'); save(); render(); closeModal('loadTplModal');
-}
 
-function deleteTemplate(id) {
-    if(confirm('Удалить шаблон?')) {
-        if(currentTplType === 'workout') sportData._templates = sportData._templates.filter(x => x.id !== id);
-        else sportData._mealTemplates = sportData._mealTemplates.filter(x => x.id !== id);
-        save(); openLoadTplModal(currentTplType, currentMealForAdd);
+    // Если истории нет, даем 3 пустых подхода
+    if (pastSets.length === 0) {
+        for(let i=0; i<3; i++) pastSets.push({ id: Date.now()+Math.random(), w: '', r: '', done: false, isDrop: false, drops:[] });
     }
-}
 
-// === КАЛЬКУЛЯТОР 1RM ===
-function openRmModal() {
-    haptic('light'); $('rmModal').style.display = 'flex'; $('rmW').value = ''; $('rmR').value = ''; calcRM();
-}
-
-function calcRM() {
-    const w = parseFloat($('rmW').value) || 0, r = parseFloat($('rmR').value) || 0;
-    if (w > 0 && r > 0) {
-        const rm = Math.round(w * (1 + r / 30));
-        $('rmResult').innerText = rm + ' кг';
-        $('rm90').innerText = Math.round(rm * 0.9); $('rm80').innerText = Math.round(rm * 0.8);
-        $('rm70').innerText = Math.round(rm * 0.7); $('rm60').innerText = Math.round(rm * 0.6);
-    } else {
-        $('rmResult').innerText = '0 кг';['rm90','rm80','rm70','rm60'].forEach(id => $(id).innerText = '0');
-    }
+    sportData[dk].workout.push({ 
+        id: Date.now()+Math.random(), 
+        name: name, 
+        sets: pastSets,
+        supersetId: null
+    });
+    
+    haptic('success');
+    save(); render(); closeModal('exModal');
 }
 
 // === МОДУЛЬ ПИТАНИЯ ===
@@ -345,7 +500,6 @@ function renderNutrition(dk) {
     $('cVal').innerText = `${Math.round(tu)}/${userGoals.u}`;
     $('fibVal').innerText = `${Math.round(tfib)}/${userGoals.fib}`;
     
-    // Глобальный прогресс-бар БЖУК
     let totalM = tp + tf + tu + tfib;
     $('globalMacroBar').innerHTML = totalM > 0 ? `
         <div class="bg-green-400" style="width:${(tp/totalM)*100}%"></div>
@@ -381,8 +535,6 @@ function renderNutrition(dk) {
                 <h4 class="font-black text-lg">${meal}</h4>
                 <div class="flex items-center gap-2">
                     <span class="text-xs font-bold text-slate-400 mr-2">${mc} ккал</span>
-                    <button onclick="openSaveTplModal('meal', '${meal}')" class="w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-floppy-disk"></i></button>
-                    <button onclick="openLoadTplModal('meal', '${meal}')" class="w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-folder-open"></i></button>
                     <button onclick="openFoodModal('${meal}')" class="w-8 h-8 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
@@ -562,13 +714,15 @@ function scanBarcode() {
     
     Quagga.init({
         inputStream: { name: "Live", type: "LiveStream", target: container },
-        decoder: { readers: ["ean_reader", "ean_8_reader"] }
+        decoder: { readers:["ean_reader", "ean_8_reader"] }
     }, function(err) {
         if (err) { alert('Ошибка камеры'); container.style.display = 'none'; isScanning = false; return; }
         Quagga.start();
     });
     
+    // ФИКС: Защита от множественного срабатывания
     Quagga.onDetected(function(result) {
+        if(!isScanning) return;
         const code = result.codeResult.code;
         Quagga.stop(); isScanning = false; container.style.display = 'none';
         fetchProductByCode(code);
@@ -619,14 +773,16 @@ function renderAnalytics() {
         
         if(day.workout.length > 0) {
             totalWo++;
-            day.workout.forEach(w => { totalTon += (parseFloat(w.w)||0) * (parseFloat(w.r)||0); });
+            day.workout.forEach(w => { 
+                // Считаем тоннаж по новой структуре
+                if(w.sets) w.sets.forEach(s => totalTon += (parseFloat(s.w)||0) * (parseFloat(s.r)||0));
+            });
         }
     }
     
     $('statTotalWo').innerText = totalWo;
     $('statTonnage').innerHTML = (totalTon / 1000).toFixed(1) + '<span class="text-sm">т</span>';
     
-    // ПУНКТ 5: График БЖУК за 7 дней (Группированный)
     drawChart('chartCals', 'bar', { 
         labels: dates, 
         datasets:[
@@ -704,10 +860,12 @@ function openDayDetails(dk) {
         let html = '';
         if(dayData.workout.length > 0) {
             let ton = 0;
-            dayData.workout.forEach(w => ton += (parseFloat(w.w)||0)*(parseFloat(w.r)||0));
+            dayData.workout.forEach(w => {
+                if(w.sets) w.sets.forEach(s => ton += (parseFloat(s.w)||0)*(parseFloat(s.r)||0));
+            });
             html += `<h4 class="font-black text-sm mb-2 text-blue-500"><i class="fa-solid fa-dumbbell"></i> Тренировка (${ton} кг)</h4>`;
             dayData.workout.forEach(w => {
-                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-2 rounded-lg mb-1 flex justify-between"><span>${w.n}</span><span>${w.w} × ${w.r}</span></div>`;
+                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-2 rounded-lg mb-1 flex justify-between"><span>${w.name}</span><span>${w.sets?.length||0} подх.</span></div>`;
             });
         }
         if(dayData.food.length > 0) {
@@ -727,11 +885,11 @@ function populateExSelect() {
     const select = $('analyticsExSelect');
     if(!select) return;
     const exSet = new Set();
-    Object.values(sportData).forEach(d => d.workout?.forEach(w => exSet.add(w.n)));
+    Object.values(sportData).forEach(d => d.workout?.forEach(w => exSet.add(w.name || w.n)));
     
     select.innerHTML = '<option value="">Выберите упражнение...</option>';
     Array.from(exSet).sort().forEach(ex => {
-        select.innerHTML += `<option value="${ex}">${ex}</option>`;
+        if(ex) select.innerHTML += `<option value="${ex}">${ex}</option>`;
     });
 }
 
@@ -742,7 +900,7 @@ function renderExProgressChart() {
         return;
     }
     
-    const dates = [];
+    const dates =[];
     const maxWeights =[];
     
     const now = new Date();
@@ -752,11 +910,11 @@ function renderExProgressChart() {
         const dayData = sportData[dk];
         
         if(dayData && dayData.workout) {
-            const sets = dayData.workout.filter(w => w.n === exName);
-            if(sets.length > 0) {
+            const ex = dayData.workout.find(w => (w.name || w.n) === exName);
+            if(ex && ex.sets) {
                 dates.push(d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}));
                 let maxW = 0;
-                sets.forEach(s => { if(parseFloat(s.w) > maxW) maxW = parseFloat(s.w); });
+                ex.sets.forEach(s => { if(parseFloat(s.w) > maxW) maxW = parseFloat(s.w); });
                 maxWeights.push(maxW);
             }
         }
