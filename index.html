@@ -40,42 +40,68 @@
         
         .food-img-thumb { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; }
 
-        /* НОВЫЙ ДИЗАЙН ТРЕНИРОВОК (КРУПНЫЙ) */
-        .ex-card { background: var(--tg-theme-bg-color, #ffffff); border-radius: 24px; padding: 20px; margin-bottom: 16px; position: relative; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.03); }
-        .ex-card.superset-linked { margin-bottom: 4px; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
-        .ex-card.superset-linked + .ex-card.superset-linked { border-top-left-radius: 8px; border-top-right-radius: 8px; margin-top: 0; }
-        .superset-line { position: absolute; left: 0; top: 20px; bottom: 20px; width: 4px; border-radius: 0 4px 4px 0; }
+        /* ДИЗАЙН ТРЕНИРОВОК (ОБНОВЛЕННЫЙ) */
+        .ex-card { background: var(--tg-theme-bg-color, #ffffff); border-radius: 24px; padding: 20px; margin-bottom: 16px; position: relative; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid transparent; width: 100%; }
+        .ex-card.superset-linked { border-color: rgba(59, 130, 246, 0.2); background: #f8fafc; }
         
         .set-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.04); transition: opacity 0.3s; }
         .set-row:last-child { border-bottom: none; }
-        .set-ghost { opacity: 0.5; }
+        .set-ghost { opacity: 0.4; }
         
-        .set-input { width: 60px; text-align: center; background: var(--tg-theme-secondary-bg-color, #f1f5f9); border-radius: 12px; padding: 10px 4px; font-weight: 900; font-size: 20px; outline: none; color: inherit; border: 2px solid transparent; transition: 0.2s; }
+        .set-input { width: 55px; text-align: center; background: var(--tg-theme-secondary-bg-color, #f1f5f9); border-radius: 10px; padding: 8px 4px; font-weight: 900; font-size: 18px; outline: none; color: inherit; border: 2px solid transparent; transition: 0.2s; }
         .set-input:focus { border-color: #3b82f6; background: transparent; }
         .set-ghost .set-input { background: transparent; border: 2px dashed #cbd5e1; color: #94a3b8; }
         
         .check-btn { width: 32px; height: 32px; border-radius: 10px; background: #f1f5f9; color: #94a3b8; display: flex; align-items: center; justify-content: center; transition: 0.2s; cursor: pointer; font-weight: 800; font-size: 14px; flex-shrink: 0; }
         .check-btn.done { background: #22c55e; color: white; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3); }
         
-        .drop-row { display: flex; align-items: center; gap: 8px; padding: 8px 0 8px 32px; position: relative; }
-        .drop-row::before { content: '↳'; position: absolute; left: 12px; color: #cbd5e1; font-weight: 900; font-size: 16px; }
+        .drop-row { display: flex; align-items: center; gap: 6px; padding: 6px 0 6px 28px; position: relative; }
+        .drop-row::before { content: '↳'; position: absolute; left: 10px; color: #cbd5e1; font-weight: 900; font-size: 14px; }
         
         .ex-summary { font-size: 13px; color: #64748b; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 4px; }
         .ex-summary span.done { color: var(--tg-theme-text-color, #0f172a); font-weight: 800; }
+        
+        .note-preview { font-size: 12px; color: #94a3b8; font-style: italic; margin-top: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; background: #f8fafc; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #3b82f6; }
+
+        .macro-circle { position: relative; width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .macro-circle::before { content: ''; position: absolute; inset: 0; border-radius: 50%; padding: 8px; background: conic-gradient(var(--c-color) var(--p), rgba(255,255,255,0.2) 0); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+        .macro-circle.over::before { background: conic-gradient(#ef4444 var(--p), rgba(255,255,255,0.2) 0); }
+        
+        .macro-line-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+        .macro-line-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+        .macro-line-fill.over { background-color: #ef4444 !important; }
+
+        #globalCalendarWrap { position: absolute; top: 100%; left: 0; right: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid #f1f5f9; box-shadow: 0 10px 20px rgba(0,0,0,0.05); z-index: 30; transform-origin: top; transition: transform 0.3s, opacity 0.3s; transform: scaleY(0); opacity: 0; pointer-events: none; }
+        #globalCalendarWrap.open { transform: scaleY(1); opacity: 1; pointer-events: auto; }
     </style>
 </head>
 <body>
 
-    <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex justify-between items-center" style="background-color: var(--tg-theme-bg-color);">
+    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 px-4 py-3 flex justify-between items-center" style="background-color: var(--tg-theme-bg-color);">
         <button onclick="changeDate(-1)" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-chevron-left"></i></button>
-        <div class="text-center flex flex-col items-center" onclick="goToday()">
+        <div class="text-center flex flex-col items-center cursor-pointer" onclick="toggleGlobalCalendar()">
             <div class="flex items-center gap-2">
                 <h2 id="dateDisplay" class="text-lg font-black tracking-tight">Сегодня</h2>
-                <span id="syncStatus" class="text-slate-300 text-xs transition-all"><i class="fa-solid fa-cloud"></i></span>
+                <i id="globalCalIcon" class="fa-solid fa-chevron-down text-xs text-slate-400 transition-transform"></i>
             </div>
-            <p id="dateSubDisplay" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Загрузка...</p>
+            <div class="flex items-center gap-1">
+                <p id="dateSubDisplay" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Загрузка...</p>
+                <span id="syncStatus" class="text-slate-300 text-[10px] transition-all ml-1"><i class="fa-solid fa-cloud"></i></span>
+            </div>
         </div>
         <button onclick="changeDate(1)" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center"><i class="fa-solid fa-chevron-right"></i></button>
+        
+        <div id="globalCalendarWrap" class="p-4">
+            <div class="flex justify-between items-center mb-4">
+                <button onclick="changeCalMonth(-1)" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                <span id="calMonthLabel" class="text-sm font-bold text-slate-700 w-32 text-center"></span>
+                <button onclick="changeCalMonth(1)" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2">
+                <div>ПН</div><div>ВТ</div><div>СР</div><div>ЧТ</div><div>ПТ</div><div>СБ</div><div>ВС</div>
+            </div>
+            <div id="globalCalendarGrid" class="grid grid-cols-7 gap-1 text-center"></div>
+        </div>
     </header>
 
     <main class="p-4">
@@ -106,25 +132,51 @@
 
         <!-- ВЬЮ: ПИТАНИЕ -->
         <div id="view-nutrition" class="space-y-4 hidden">
-            <div class="card bg-gradient-to-br from-orange-400 to-red-500 text-white border-0">
-                <div class="flex justify-between items-center mb-4">
-                    <div>
-                        <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Калории</p>
-                        <h4 class="text-4xl font-black tabular-nums"><span id="calEaten">0</span><span class="text-xl opacity-50">/<span id="calGoalDisplay">2500</span></span></h4>
+            <div class="card bg-gradient-to-br from-orange-400 to-red-500 text-white border-0 shadow-sm">
+                <div class="absolute top-4 right-4 flex gap-2">
+                    <button onclick="openGoalModal()" class="text-white/70 hover:text-white"><i class="fa-solid fa-gear"></i></button>
+                </div>
+                
+                <div class="flex items-center gap-6 mb-4 mt-2">
+                    <div id="calCircle" class="macro-circle" style="--c-color: #ffffff; --p: 0%;">
+                        <div class="text-center">
+                            <p class="text-[10px] font-black text-white/70 uppercase tracking-widest mb-1" id="calStatusLabel">Осталось</p>
+                            <h4 class="text-2xl font-black text-white tabular-nums leading-none" id="calLeft">0</h4>
+                            <p class="text-[10px] font-bold text-white/70 mt-1">ккал</p>
+                        </div>
                     </div>
-                    <div class="text-right flex flex-col items-end">
-                        <button onclick="openGoalModal()" class="mb-1 text-white/70 hover:text-white"><i class="fa-solid fa-gear"></i></button>
-                        <p class="text-[10px] font-black opacity-70 uppercase tracking-widest">Осталось</p>
-                        <h4 class="text-2xl font-black tabular-nums" id="calLeft">2500</h4>
+                    
+                    <div class="flex-1 space-y-3">
+                        <div>
+                            <div class="flex justify-between items-end mb-1">
+                                <span class="text-white/80 uppercase text-[10px] font-bold pb-[1px]">Белки</span>
+                                <span class="text-white font-black text-sm tabular-nums" id="pVal">0 / 160г</span>
+                            </div>
+                            <div class="macro-line-bg"><div id="pBar" class="macro-line-fill" style="background-color: #4ade80; width: 0%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-end mb-1">
+                                <span class="text-white/80 uppercase text-[10px] font-bold pb-[1px]">Жиры</span>
+                                <span class="text-white font-black text-sm tabular-nums" id="fVal">0 / 70г</span>
+                            </div>
+                            <div class="macro-line-bg"><div id="fBar" class="macro-line-fill" style="background-color: #a855f7; width: 0%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-end mb-1">
+                                <span class="text-white/80 uppercase text-[10px] font-bold pb-[1px]">Углеводы</span>
+                                <span class="text-white font-black text-sm tabular-nums" id="cVal">0 / 300г</span>
+                            </div>
+                            <div class="macro-line-bg"><div id="cBar" class="macro-line-fill" style="background-color: #60a5fa; width: 0%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between items-end mb-1">
+                                <span class="text-white/80 uppercase text-[10px] font-bold pb-[1px]">Клетчатка</span>
+                                <span class="text-white font-black text-sm tabular-nums" id="fibVal">0 / 30г</span>
+                            </div>
+                            <div class="macro-line-bg"><div id="fibBar" class="macro-line-fill" style="background-color: #facc15; width: 0%"></div></div>
+                        </div>
                     </div>
                 </div>
-                <div class="flex gap-2 text-center">
-                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-green-200">Белки</p><p class="font-black text-sm" id="pVal">0/160</p></div>
-                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-red-200">Жиры</p><p class="font-black text-sm" id="fVal">0/70</p></div>
-                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-blue-200">Углеводы</p><p class="font-black text-sm" id="cVal">0/300</p></div>
-                    <div class="flex-1 bg-white/20 rounded-xl p-2"><p class="text-[8px] uppercase opacity-90 font-bold text-yellow-200">Клетчатка</p><p class="font-black text-sm" id="fibVal">0/30</p></div>
-                </div>
-                <div id="globalMacroBar" class="flex h-1.5 w-full rounded-full overflow-hidden mt-3 opacity-80"></div>
             </div>
 
             <div class="card water-card border-0 flex justify-between items-center" style="background-color: var(--tg-theme-secondary-bg-color);">
@@ -134,8 +186,8 @@
                     <h4 class="text-3xl font-black text-sky-600 tabular-nums" id="waterVal">0 <span class="text-lg opacity-50">/ 2000</span></h4>
                 </div>
                 <div class="flex gap-2 relative z-10">
-                    <button onclick="addWater(-250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-sm">-250</button>
-                    <button onclick="addWater(250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-sm">+250</button>
+                    <button onclick="addWater(-250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">-250</button>
+                    <button onclick="addWater(250)" class="w-12 h-12 bg-white text-sky-500 rounded-xl shadow-sm font-black text-xs">+250</button>
                 </div>
             </div>
 
@@ -148,33 +200,14 @@
         <!-- ВЬЮ: АНАЛИТИКА -->
         <div id="view-analytics" class="space-y-4 hidden pb-10">
             <h3 class="text-3xl font-black tracking-tight mb-4">Аналитика</h3>
-            <div class="card">
-                <div class="flex justify-between items-center cursor-pointer" onclick="toggleCalendar()">
-                    <div class="flex items-center gap-2">
-                        <h4 class="font-black text-sm">Календарь</h4>
-                        <span id="calCurrentDateBadge" class="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md"></span>
-                    </div>
-                    <i id="calToggleIcon" class="fa-solid fa-chevron-down text-slate-400 transition-transform"></i>
-                </div>
-                <div id="calendarWrapper" class="transition-all duration-300 overflow-hidden" style="max-height: 0px;">
-                    <div class="flex justify-between items-center mb-4 mt-4">
-                        <button onclick="changeCalMonth(-1)" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-left text-xs"></i></button>
-                        <span id="calMonthLabel" class="text-sm font-bold text-slate-700 w-32 text-center"></span>
-                        <button onclick="changeCalMonth(1)" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-chevron-right text-xs"></i></button>
-                    </div>
-                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-2">
-                        <div>ПН</div><div>ВТ</div><div>СР</div><div>ЧТ</div><div>ПТ</div><div>СБ</div><div>ВС</div>
-                    </div>
-                    <div id="analyticsCalendar" class="grid grid-cols-7 gap-1 text-center"></div>
-                </div>
-            </div>
 
             <div class="grid grid-cols-2 gap-3 mb-4">
                 <div class="card m-0 text-center py-5"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тренировок (7 дн)</p><h4 id="statTotalWo" class="text-4xl font-black text-blue-500 tabular-nums">0</h4></div>
                 <div class="card m-0 text-center py-5"><p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Тоннаж (7 дн)</p><h4 id="statTonnage" class="text-4xl font-black text-green-500 tabular-nums">0<span class="text-lg">т</span></h4></div>
             </div>
             
-            <div class="card"><h4 class="font-black text-sm mb-4">Макронутриенты (7 дней)</h4><div class="h-48 relative w-full"><canvas id="chartCals"></canvas></div></div>
+            <div class="card"><h4 class="font-black text-sm mb-4">Калории vs Цель (7 дней)</h4><div class="h-48 relative w-full"><canvas id="chartCalsLine"></canvas></div></div>
+            <div class="card"><h4 class="font-black text-sm mb-4">Потребление воды (7 дней)</h4><div class="h-40 relative w-full"><canvas id="chartWater"></canvas></div></div>
             <div class="card"><h4 class="font-black text-sm mb-4">БЖУК (Среднее за 7 дней)</h4><div class="h-40 relative w-full"><canvas id="chartMacros"></canvas></div></div>
 
             <div class="card">
@@ -264,8 +297,9 @@
             <div id="scanner-container">
                 <video autoplay muted playsinline></video>
                 <div class="scan-line"></div>
-                <div class="absolute bottom-2 left-0 right-0 px-4">
+                <div class="absolute bottom-2 left-0 right-0 px-4 flex gap-2">
                     <input type="number" id="manualBarcode" placeholder="Или введите штрих-код вручную" class="w-full p-2 text-xs rounded-lg text-center bg-white/90 backdrop-blur" onchange="fetchProductByCode(this.value)">
+                    <button onclick="stopScanner()" class="bg-red-500 text-white px-3 rounded-lg text-xs font-bold">✕</button>
                 </div>
             </div>
             
@@ -279,11 +313,11 @@
             </div>
             
             <div class="grid grid-cols-5 gap-2 mb-8">
-                <div class="text-center"><p class="text-[10px] font-bold text-slate-400 mb-1">Ккал</p><input type="number" id="customFoodC" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-sm" readonly></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-green-500 mb-1">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-sm" oninput="onMacroChange()"></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-red-500 mb-1">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-sm" oninput="onMacroChange()"></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-blue-500 mb-1">У</p><input type="number" id="customFoodU" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-sm" oninput="onMacroChange()"></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-yellow-500 mb-1">Кл</p><input type="number" id="customFoodFib" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-sm" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-slate-400 mb-1">Ккал</p><input type="number" id="customFoodC" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-xs" readonly></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-green-500 mb-1">Б</p><input type="number" id="customFoodP" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-purple-500 mb-1">Ж</p><input type="number" id="customFoodF" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-blue-500 mb-1">У</p><input type="number" id="customFoodU" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-xs" oninput="onMacroChange()"></div>
+                <div class="text-center"><p class="text-[9px] font-bold text-yellow-500 mb-1">Кл</p><input type="number" id="customFoodFib" value="0" class="w-full p-3 bg-slate-100 rounded-xl text-center font-black outline-none text-xs" oninput="onMacroChange()"></div>
             </div>
             <button onclick="confirmAddFood()" class="w-full bg-orange-500 text-white p-5 rounded-2xl font-black uppercase text-sm shadow-lg shadow-orange-500/30">Сохранить продукт</button>
         </div>
@@ -302,11 +336,33 @@
             </div>
             <div class="grid grid-cols-4 gap-3 mb-8">
                 <div class="text-center"><p class="text-[10px] font-bold text-green-500 uppercase mb-2">Белки</p><input type="number" id="goalP" class="custom-input text-center px-1 font-black"></div>
-                <div class="text-center"><p class="text-[10px] font-bold text-red-500 uppercase mb-2">Жиры</p><input type="number" id="goalF" class="custom-input text-center px-1 font-black"></div>
+                <div class="text-center"><p class="text-[10px] font-bold text-purple-500 uppercase mb-2">Жиры</p><input type="number" id="goalF" class="custom-input text-center px-1 font-black"></div>
                 <div class="text-center"><p class="text-[10px] font-bold text-blue-500 uppercase mb-2">Угли</p><input type="number" id="goalU" class="custom-input text-center px-1 font-black"></div>
                 <div class="text-center"><p class="text-[10px] font-bold text-yellow-500 uppercase mb-2">Клетч</p><input type="number" id="goalFib" class="custom-input text-center px-1 font-black"></div>
             </div>
             <button onclick="saveGoals()" class="w-full bg-blue-500 text-white p-5 rounded-2xl font-black uppercase text-sm shadow-lg shadow-blue-500/30">Сохранить цели</button>
+        </div>
+    </div>
+
+    <!-- МОДАЛКИ ШАБЛОНОВ -->
+    <div id="saveTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('saveTplModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Сохранить как шаблон</h3>
+                <button onclick="closeModal('saveTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="tplNameInput" placeholder="Название шаблона (напр. День Ног)" class="custom-input mb-6">
+            <button onclick="confirmSaveTemplate()" class="w-full bg-slate-900 text-white p-4 rounded-xl font-black uppercase text-sm shadow-lg">Сохранить</button>
+        </div>
+    </div>
+
+    <div id="loadTplModal" class="modal-overlay" onclick="if(event.target===this) closeModal('loadTplModal')">
+        <div class="modal-content">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black">Мои шаблоны</h3>
+                <button onclick="closeModal('loadTplModal')" class="w-8 h-8 bg-slate-100 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="tplList" class="space-y-2 max-h-60 overflow-y-auto"></div>
         </div>
     </div>
 
