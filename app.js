@@ -253,7 +253,6 @@ function renderSport(dk) {
         let ssStyle = '';
         let mb = '16px';
         let br = '24px';
-        let lineHtml = '';
 
         const nextEx = workout[exIdx + 1];
         const prevEx = workout[exIdx - 1];
@@ -264,14 +263,9 @@ function renderSport(dk) {
             if (!ssColorMap[ex.supersetId]) { ssColorMap[ex.supersetId] = ssColors[ssCounter % ssColors.length]; ssCounter++; }
             ssStyle = `border-left: 4px solid ${ssColorMap[ex.supersetId]};`;
             
-            if (isLinkedToNext) {
-                mb = '8px'; 
-                br = !isLinkedToPrev ? '24px 24px 8px 8px' : '8px';
-                lineHtml = `<div class="absolute top-6 bottom-[-8px] left-1/2 -translate-x-1/2 w-[3px] rounded-full z-0" style="background-color: ${ssColorMap[ex.supersetId]}"></div>`;
-            } else {
-                mb = '16px'; 
-                br = isLinkedToPrev ? '8px 8px 24px 24px' : '24px';
-            }
+            if (isLinkedToNext && !isLinkedToPrev) { mb = '4px'; br = '24px 24px 8px 8px'; }
+            else if (isLinkedToNext && isLinkedToPrev) { mb = '4px'; br = '8px'; }
+            else if (!isLinkedToNext && isLinkedToPrev) { mb = '16px'; br = '8px 8px 24px 24px'; }
         }
 
         const summaryHtml = ex.sets.map(s => `<span class="${s.done ? 'done' : ''}">${s.w||0}${label1} ${label2} ${s.r||0}</span>`).join(', ');
@@ -293,7 +287,7 @@ function renderSport(dk) {
                                 </div>
                                 <div class="flex items-center gap-1 ml-2">
                                     <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-1.5 rounded-lg uppercase tracking-wider">Дроп</button>
-                                    <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white border border-slate-100 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>
+                                    <button onclick="deleteSet('${ex.id}', '${s.id}')" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-trash text-sm"></i></button>
                                 </div>
                             </div>
                             ${s.isDrop ? `
@@ -305,7 +299,7 @@ function renderSport(dk) {
                                                 <span class="text-slate-300 font-black text-lg mx-1">×</span>
                                                 <input type="number" value="${d.r}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'r', this.value)" class="set-input bg-white" placeholder="-">
                                             </div>
-                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white border border-slate-100 hover:bg-red-50 rounded-full transition ml-2"><i class="fa-solid fa-xmark"></i></button>
+                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-xmark"></i></button>
                                         </div>
                                     `).join('')}
                                     <button onclick="addDrop('${ex.id}', '${s.id}')" class="text-xs font-bold text-purple-500 bg-purple-50 px-3 py-2 rounded-lg mt-1">+ Сброс веса</button>
@@ -327,31 +321,25 @@ function renderSport(dk) {
         `;
 
         return `
-        <div class="ex-wrapper" style="margin-bottom: ${mb};">
-            <div class="ex-number-col">
-                <div class="ex-number">${exIdx + 1}</div>
-                ${lineHtml}
-            </div>
-            <div class="ex-card" style="border-radius: ${br}; ${ssStyle} margin-bottom: 0;">
-                ${isSupersetMode ? `<input type="checkbox" class="absolute right-5 top-5 w-6 h-6 accent-blue-500 z-10" onchange="toggleSupersetSelection('${ex.id}', this.checked)">` : ''}
-                
-                <div class="flex justify-between items-start cursor-pointer" onclick="toggleExExpand('${ex.id}')">
-                    <div class="flex-1 pr-8">
-                        <div class="flex items-center gap-2">
-                            <h4 class="font-black text-xl text-slate-800 leading-tight">${ex.name}</h4>
-                        </div>
-                        <div class="ex-summary mt-2" id="ex-sum-${ex.id}">
-                            ${summaryHtml || 'Нет подходов'}
-                            ${ex.note ? `<div class="note-preview"><i class="fa-solid fa-paperclip mr-1"></i> ${ex.note}</div>` : ''}
-                        </div>
-                    </div>
+        <div class="ex-card" style="margin-bottom: ${mb}; border-radius: ${br}; ${ssStyle}">
+            ${isSupersetMode ? `<input type="checkbox" class="absolute right-5 top-5 w-6 h-6 accent-blue-500 z-10" onchange="toggleSupersetSelection('${ex.id}', this.checked)">` : ''}
+            
+            <div class="flex justify-between items-start cursor-pointer" onclick="toggleExExpand('${ex.id}')">
+                <div class="flex-1 pr-8">
                     <div class="flex items-center gap-2">
-                        ${ex.supersetId ? `<button onclick="event.stopPropagation(); removeFromSuperset('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-orange-500 bg-slate-50 hover:bg-orange-50 rounded-full transition" title="Убрать из суперсета"><i class="fa-solid fa-link-slash text-xs"></i></button>` : ''}
-                        <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>
+                        <h4 class="font-black text-xl text-slate-800 leading-tight">${ex.name}</h4>
+                    </div>
+                    <div class="ex-summary mt-2" id="ex-sum-${ex.id}">
+                        ${summaryHtml || 'Нет подходов'}
+                        ${ex.note ? `<div class="note-preview"><i class="fa-solid fa-paperclip mr-1"></i> ${ex.note}</div>` : ''}
                     </div>
                 </div>
-                ${expandedHtml}
+                <div class="flex items-center gap-2">
+                    ${ex.supersetId ? `<button onclick="event.stopPropagation(); removeFromSuperset('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-orange-500 bg-slate-50 hover:bg-orange-50 rounded-full transition" title="Убрать из суперсета"><i class="fa-solid fa-link-slash text-xs"></i></button>` : ''}
+                    <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>
+                </div>
             </div>
+            ${expandedHtml}
         </div>
         `;
     }).join('');
