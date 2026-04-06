@@ -7,9 +7,17 @@ const SUPABASE_URL = 'https://hvoznktittcvsqtepopp.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_mw_ldS2k_bWXSWd4ikNQCA_rCZ6OQYs'; 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const setTxt = (id, txt) => { const el = document.getElementById(id); if(el) el.innerText = txt; };
 const $ = id => document.getElementById(id);
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-function haptic(style = 'light') { try { if(tg.HapticFeedback) tg.HapticFeedback.impactOccurred(style); } catch(e){} }
+
+function haptic(style = 'light') { 
+    try { 
+        if(window.Telegram?.WebApp?.HapticFeedback?.impactOccurred) {
+            window.Telegram.WebApp.HapticFeedback.impactOccurred(style); 
+        } 
+    } catch(e){} 
+}
 
 function setSyncStatus(status) {
     const el = $('syncStatus');
@@ -20,17 +28,7 @@ function setSyncStatus(status) {
     else el.innerHTML = '<i class="fa-solid fa-cloud text-slate-300"></i>';
 }
 
-// --- БЕЗОПАСНАЯ РАБОТА С ПАМЯТЬЮ (ФИКС ДЛЯ TELEGRAM iOS) ---
-const safeStorage = {
-    get: function(key) {
-        try { return localStorage.getItem(key); } catch(e) { return null; }
-    },
-    set: function(key, value) {
-        try { localStorage.setItem(key, value); } catch(e) { console.warn('Storage blocked by Telegram'); }
-    }
-};
-
-const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Сведение рук в кроссовере","Пуловер","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Сведение ног в тренажере","Разведение ног в тренажере","Гакк-присед","Приседания в Смите","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Тяга нижнего блока","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Тяга Т-грифа","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Обратные разводки (задняя дельта)","Жим сидя в Смите","Подъем на бицепс (штанга)","Подъем гантелей на бицепс","Молотки","Концентрированный подъем","Сгибания на нижнем блоке","Французский жим","Разгибания на блоке","Разгибания из-за головы","Отжимания узким хватом","Планка","Скручивания","Подъем ног в висе","Русский твист","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи","Степпер","Ходьба"].sort();
+const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Сведение рук в кроссовере","Пуловер","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Сведение ног в тренажере","Разведение ног в тренажере","Гакк-присед","Приседания в Смите","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Тяга нижнего блока","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Тяга Т-грифа","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Обратные разводки (задняя дельта)","Жим сидя в Смите","Подъем на бицепс (штанга)","Подъем гантелей на бицепс","Молотки","Концентрированный подъем","Сгибания на нижнем блоке","Французский жим","Разгибания на блоке","Разгибания из-за головы","Отжимания узким хватом","Планка","Скручивания","Подъем ног в висе","Русский твист","Молитва (пресс)","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи","Степпер","Ходьба"].sort();
 const CARDIO_LIST =['бег', 'эллипс', 'велотренажер', 'гребля', 'скакалка', 'берпи', 'ходьба', 'степпер'];
 
 const FOOD_DB =[
@@ -60,11 +58,9 @@ const FOOD_DB =[
 // --- СОСТОЯНИЕ ---
 let pivotDate = new Date();
 let currentTab = 'sport';
-
-// БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ ЦЕЛЕЙ
 let userGoals = { c: 2500, p: 160, f: 70, u: 300, fib: 30, water: 2000 };
 try {
-    const savedGoals = safeStorage.get('tma_user_goals');
+    const savedGoals = localStorage.getItem('tma_user_goals');
     if (savedGoals) userGoals = JSON.parse(savedGoals);
 } catch(e) {}
 
@@ -105,10 +101,8 @@ function migrateData() {
 // --- ОБЛАЧНЫЕ СОХРАНЕНИЯ SUPABASE ---
 async function initData() {
     setSyncStatus('loading');
-    
-    // Безопасная загрузка из локального хранилища
     try { 
-        const localData = safeStorage.get('tma_sport_data');
+        const localData = localStorage.getItem('tma_sport_data');
         sportData = localData ? JSON.parse(localData) : {}; 
     } catch(e) { sportData = {}; }
     
@@ -125,7 +119,7 @@ async function initData() {
             if (data && data.data) {
                 sportData = data.data;
                 migrateData(); 
-                safeStorage.set('tma_sport_data', JSON.stringify(sportData));
+                try { localStorage.setItem('tma_sport_data', JSON.stringify(sportData)); } catch(e){}
                 render(); 
                 setSyncStatus('success');
             } else setSyncStatus('idle');
@@ -135,8 +129,7 @@ async function initData() {
 
 function save() {
     try {
-        safeStorage.set('tma_sport_data', JSON.stringify(sportData));
-        
+        localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
         setTimeout(() => {
             setSyncStatus('loading');
             const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
@@ -166,11 +159,68 @@ function changeDate(delta) { haptic('light'); pivotDate.setDate(pivotDate.getDat
 function goToday() { haptic('light'); pivotDate = new Date(); render(); }
 function closeModal(id) { $(id).style.display = 'none'; }
 
+// Глобальный календарь
+function toggleGlobalCalendar() {
+    const wrap = $('globalCalendarWrap');
+    const icon = $('globalCalIcon');
+    if(wrap && icon) {
+        if(wrap.classList.contains('open')) {
+            wrap.classList.remove('open');
+            icon.style.transform = 'rotate(0deg)';
+        } else {
+            wrap.classList.add('open');
+            icon.style.transform = 'rotate(180deg)';
+            renderGlobalCalendar();
+        }
+    }
+}
+
+function changeCalMonth(delta) { haptic('light'); calPivot.setMonth(calPivot.getMonth() + delta); renderGlobalCalendar(); }
+
+function renderGlobalCalendar() {
+    const grid = $('globalCalendarGrid');
+    if(!grid) return;
+    grid.innerHTML = '';
+    
+    const year = calPivot.getFullYear();
+    const month = calPivot.getMonth();
+    setTxt('calMonthLabel', calPivot.toLocaleDateString('ru-RU', {month: 'long', year: 'numeric'}));
+    
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    let startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+    
+    for(let i=0; i<startDay; i++) grid.innerHTML += `<div></div>`;
+    
+    for(let i=1; i<=lastDay.getDate(); i++) {
+        const d = new Date(year, month, i);
+        const dk = iso(d);
+        const dayData = sportData[dk];
+        const hasWorkout = dayData && dayData.workout && dayData.workout.length > 0;
+        const isToday = dk === iso(new Date());
+        const isSelected = dk === iso(pivotDate);
+        
+        let bgClass = 'bg-slate-50 text-slate-600';
+        if(hasWorkout) bgClass = 'bg-blue-100 text-blue-600 font-black border border-blue-200';
+        if(isToday) bgClass += ' ring-2 ring-orange-400';
+        if(isSelected) bgClass = 'bg-slate-900 text-white shadow-md';
+        
+        grid.innerHTML += `<div onclick="selectGlobalDate('${dk}')" class="h-10 rounded-xl flex items-center justify-center text-xs cursor-pointer transition-all ${bgClass}">${i}</div>`;
+    }
+}
+
+function selectGlobalDate(dk) {
+    haptic('light');
+    pivotDate = new Date(dk);
+    toggleGlobalCalendar();
+    render();
+}
+
 function render() {
     const dk = iso(pivotDate);
     const isToday = dk === iso(new Date());
-    $('dateDisplay').innerText = isToday ? 'Сегодня' : pivotDate.toLocaleDateString('ru-RU', {weekday: 'long'});
-    $('dateSubDisplay').innerText = pivotDate.toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'});
+    setTxt('dateDisplay', isToday ? 'Сегодня' : pivotDate.toLocaleDateString('ru-RU', {weekday: 'long'}));
+    setTxt('dateSubDisplay', pivotDate.toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'}));
 
     if(!sportData[dk]) sportData[dk] = { workout: [], food:[], water: 0, activeMeals:['Завтрак', 'Обед', 'Ужин', 'Перекус'] };
 
@@ -182,6 +232,7 @@ function render() {
 // === МОДУЛЬ СПОРТА ===
 function renderSport(dk) {
     const list = $('workoutList');
+    if(!list) return;
     const workout = sportData[dk].workout;
     
     if (workout.length === 0) {
@@ -193,28 +244,21 @@ function renderSport(dk) {
     let ssColorMap = {};
     let ssCounter = 0;
 
-    list.innerHTML = workout.map((ex) => {
+    list.innerHTML = workout.map((ex, exIdx) => {
         const isCardio = CARDIO_LIST.some(c => ex.name.toLowerCase().includes(c));
         const label1 = isCardio ? 'мин' : 'кг';
         const label2 = isCardio ? 'ур' : '×';
         
-        let ssLine = '';
-        let ssClass = '';
+        let ssStyle = '';
         if (ex.supersetId) {
             if (!ssColorMap[ex.supersetId]) { ssColorMap[ex.supersetId] = ssColors[ssCounter % ssColors.length]; ssCounter++; }
-            ssLine = `<div class="superset-line" style="background-color: ${ssColorMap[ex.supersetId]}"></div>`;
-            ssClass = 'superset-linked pl-6';
+            ssStyle = `border-left: 4px solid ${ssColorMap[ex.supersetId]};`;
         }
 
         const summaryHtml = ex.sets.map(s => `<span class="${s.done ? 'done' : ''}">${s.w||0}${label1} ${label2} ${s.r||0}</span>`).join(', ');
 
         const expandedHtml = `
             <div id="ex-body-${ex.id}" class="mt-4 hidden">
-                ${ex.note !== undefined ? `
-                    <div class="mb-4 flex gap-2">
-                        <input type="text" value="${ex.note}" onchange="updateExNote('${ex.id}', this.value)" placeholder="Заметка к упражнению..." class="custom-input text-sm py-3 flex-1">
-                    </div>
-                ` : ''}
                 <div class="space-y-2">
                     ${ex.sets.map((s, sIdx) => `
                         <div>
@@ -228,13 +272,9 @@ function renderSport(dk) {
                                     <span class="text-slate-300 font-black text-lg mx-1">${isCardio ? '|' : label2}</span>
                                     <input type="number" value="${s.r}" onchange="updateSetVal('${ex.id}', '${s.id}', 'r', this.value)" class="set-input" placeholder="-">
                                 </div>
-                                <div class="relative">
-                                    <button onclick="toggleSetMenu('${s.id}')" class="text-slate-400 hover:text-slate-600 p-2"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-                                    <div id="overlay-${s.id}" class="hidden fixed inset-0 z-40" onclick="toggleSetMenu('${s.id}')"></div>
-                                    <div id="menu-${s.id}" class="hidden absolute right-0 top-full mt-1 bg-white shadow-2xl rounded-xl border border-slate-100 z-50 w-32 overflow-hidden">
-                                        <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-purple-600 hover:bg-purple-50">Дропсет</button>
-                                        <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-full text-left px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50">Удалить</button>
-                                    </div>
+                                <div class="flex items-center gap-2 ml-1">
+                                    <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-1.5 rounded-lg uppercase tracking-wider">Дроп</button>
+                                    <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white border border-slate-100 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>
                                 </div>
                             </div>
                             ${s.isDrop ? `
@@ -246,7 +286,7 @@ function renderSport(dk) {
                                                 <span class="text-slate-300 font-black text-lg mx-1">×</span>
                                                 <input type="number" value="${d.r}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'r', this.value)" class="set-input bg-white" placeholder="-">
                                             </div>
-                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-xmark"></i></button>
+                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white border border-slate-100 hover:bg-red-50 rounded-full transition ml-2"><i class="fa-solid fa-xmark"></i></button>
                                         </div>
                                     `).join('')}
                                     <button onclick="addDrop('${ex.id}', '${s.id}')" class="text-xs font-bold text-purple-500 bg-purple-50 px-3 py-2 rounded-lg mt-1">+ Сброс веса</button>
@@ -255,28 +295,34 @@ function renderSport(dk) {
                         </div>
                     `).join('')}
                 </div>
-                <div class="mt-4">
-                    <button onclick="addSet('${ex.id}')" class="w-full bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition">+ Добавить подход</button>
+                <div class="mt-4 flex gap-2">
+                    <button onclick="addSet('${ex.id}')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition">+ Добавить подход</button>
+                    <button onclick="toggleNote('${ex.id}')" class="w-12 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:text-blue-500 transition"><i class="fa-regular fa-message"></i></button>
                 </div>
+                ${ex.note !== undefined ? `
+                    <div class="mt-3">
+                        <input type="text" value="${ex.note}" onchange="updateExNote('${ex.id}', this.value)" placeholder="Заметка к упражнению..." class="custom-input text-sm py-3 w-full bg-blue-50 text-blue-900 border border-blue-100">
+                    </div>
+                ` : ''}
             </div>
         `;
 
         return `
-        <div class="ex-card ${ssClass}">
-            ${ssLine}
+        <div class="ex-card" style="${ssStyle}">
             ${isSupersetMode ? `<input type="checkbox" class="absolute right-5 top-5 w-6 h-6 accent-blue-500 z-10" onchange="toggleSupersetSelection('${ex.id}', this.checked)">` : ''}
             
             <div class="flex justify-between items-start cursor-pointer" onclick="toggleExExpand('${ex.id}')">
                 <div class="flex-1 pr-8">
                     <div class="flex items-center gap-2">
-                        <h4 class="font-black text-xl text-slate-800">${ex.name}</h4>
-                        ${ex.note ? '<i class="fa-regular fa-comment-dots text-blue-400 text-sm"></i>' : ''}
+                        <h4 class="font-black text-xl text-slate-800 leading-tight">${ex.name}</h4>
                     </div>
-                    <div class="ex-summary mt-2" id="ex-sum-${ex.id}">${summaryHtml || 'Нет подходов'}</div>
+                    <div class="ex-summary mt-2" id="ex-sum-${ex.id}">
+                        ${summaryHtml || 'Нет подходов'}
+                        ${ex.note ? `<div class="note-preview"><i class="fa-solid fa-paperclip mr-1"></i> ${ex.note}</div>` : ''}
+                    </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <button onclick="event.stopPropagation(); toggleNote('${ex.id}')" class="text-slate-300 hover:text-blue-500 text-lg"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="text-slate-300 hover:text-red-500 text-lg"><i class="fa-solid fa-trash"></i></button>
+                    <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
             ${expandedHtml}
@@ -287,17 +333,20 @@ function renderSport(dk) {
 
 function toggleExExpand(id) {
     const body = $(`ex-body-${id}`); const sum = $(`ex-sum-${id}`);
-    if(body.classList.contains('hidden')) { body.classList.remove('hidden'); sum.classList.add('hidden'); } 
-    else { body.classList.add('hidden'); sum.classList.remove('hidden'); }
+    if(body && sum) {
+        if(body.classList.contains('hidden')) { body.classList.remove('hidden'); sum.classList.add('hidden'); } 
+        else { body.classList.add('hidden'); sum.classList.remove('hidden'); }
+    }
 }
 
 function toggleNote(id) {
     const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === id);
-    if(ex.note === undefined) ex.note = ''; save(); render();
+    if(ex.note === undefined) ex.note = ''; else delete ex.note;
+    save(); render();
     const body = $(`ex-body-${id}`); if(body && body.classList.contains('hidden')) toggleExExpand(id);
 }
 
-function updateExNote(id, val) { const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === id); if(ex) { ex.note = val; save(); } }
+function updateExNote(id, val) { const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === id); if(ex) { ex.note = val; save(); render(); } }
 function deleteExercise(id) { if(confirm('Удалить упражнение?')) { const dk = iso(pivotDate); sportData[dk].workout = sportData[dk].workout.filter(w => w.id !== id); save(); render(); } }
 
 function toggleSetDone(exId, setId) {
@@ -314,39 +363,24 @@ function addSet(exId) {
     haptic('light'); const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId);
     const lastSet = ex.sets[ex.sets.length - 1];
     ex.sets.push({ id: 's_'+Date.now()+Math.random(), w: lastSet?.w||'', r: lastSet?.r||'', done: false, isDrop: false, drops:[] });
-    save(); render(); setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+    save(); render(); setTimeout(() => { const body = $(`ex-body-${exId}`); if(body) body.classList.remove('hidden'); const sum = $(`ex-sum-${exId}`); if(sum) sum.classList.add('hidden'); }, 10);
 }
 
 function deleteSet(exId, setId) {
     haptic('medium'); const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId);
-    ex.sets = ex.sets.filter(s => s.id !== setId); save(); render(); setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
-}
-
-function toggleSetMenu(setId) {
-    haptic('light');
-    const menu = $(`menu-${setId}`);
-    const overlay = $(`overlay-${setId}`);
-    const isHidden = menu.classList.contains('hidden');
-    
-    document.querySelectorAll('[id^="menu-s_"]').forEach(m => m.classList.add('hidden'));
-    document.querySelectorAll('[id^="overlay-s_"]').forEach(o => o.classList.add('hidden'));
-    
-    if (isHidden) {
-        menu.classList.remove('hidden');
-        if(overlay) overlay.classList.remove('hidden');
-    }
+    ex.sets = ex.sets.filter(s => s.id !== setId); save(); render(); setTimeout(() => { const body = $(`ex-body-${exId}`); if(body) body.classList.remove('hidden'); const sum = $(`ex-sum-${exId}`); if(sum) sum.classList.add('hidden'); }, 10);
 }
 
 function makeDropSet(exId, setId) {
     const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId); const set = ex.sets.find(s => s.id === setId);
     set.isDrop = true; if(!set.drops) set.drops =[]; set.drops.push({ w: '', r: '' }); save(); render();
-    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+    setTimeout(() => { const body = $(`ex-body-${exId}`); if(body) body.classList.remove('hidden'); const sum = $(`ex-sum-${exId}`); if(sum) sum.classList.add('hidden'); }, 10);
 }
 
 function addDrop(exId, setId) {
     const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId); const set = ex.sets.find(s => s.id === setId);
     set.drops.push({ w: '', r: '' }); save(); render();
-    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+    setTimeout(() => { const body = $(`ex-body-${exId}`); if(body) body.classList.remove('hidden'); const sum = $(`ex-sum-${exId}`); if(sum) sum.classList.add('hidden'); }, 10);
 }
 
 function updateDropVal(exId, setId, dropIdx, field, val) {
@@ -357,18 +391,26 @@ function updateDropVal(exId, setId, dropIdx, field, val) {
 function deleteDrop(exId, setId, dropIdx) {
     const dk = iso(pivotDate); const ex = sportData[dk].workout.find(w => w.id === exId); const set = ex.sets.find(s => s.id === setId);
     set.drops.splice(dropIdx, 1); if(set.drops.length === 0) set.isDrop = false; save(); render();
-    setTimeout(() => { $(`ex-body-${exId}`).classList.remove('hidden'); $(`ex-sum-${exId}`).classList.add('hidden'); }, 10);
+    setTimeout(() => { const body = $(`ex-body-${exId}`); if(body) body.classList.remove('hidden'); const sum = $(`ex-sum-${exId}`); if(sum) sum.classList.add('hidden'); }, 10);
 }
 
 function toggleSupersetMode() {
     isSupersetMode = !isSupersetMode; selectedForSuperset =[];
-    $('btnSuperset').classList.toggle('bg-blue-500', isSupersetMode); $('btnSuperset').classList.toggle('text-white', isSupersetMode);
-    $('supersetPanel').classList.toggle('hidden', !isSupersetMode); render();
+    const btn = $('btnSuperset'); const panel = $('supersetPanel');
+    if(btn) { btn.classList.toggle('bg-blue-500', isSupersetMode); btn.classList.toggle('text-white', isSupersetMode); }
+    if(panel) panel.classList.toggle('hidden', !isSupersetMode); 
+    render();
 }
 
 function toggleSupersetSelection(id, isChecked) { if(isChecked) selectedForSuperset.push(id); else selectedForSuperset = selectedForSuperset.filter(x => x !== id); }
 
-function cancelSuperset() { isSupersetMode = false; selectedForSuperset =[]; $('btnSuperset').classList.remove('bg-blue-500', 'text-white'); $('supersetPanel').classList.add('hidden'); render(); }
+function cancelSuperset() { 
+    isSupersetMode = false; selectedForSuperset =[]; 
+    const btn = $('btnSuperset'); const panel = $('supersetPanel');
+    if(btn) btn.classList.remove('bg-blue-500', 'text-white'); 
+    if(panel) panel.classList.add('hidden'); 
+    render(); 
+}
 
 function confirmSuperset() {
     if(selectedForSuperset.length < 2) return alert('Выберите минимум 2 упражнения!');
@@ -379,11 +421,21 @@ function confirmSuperset() {
 }
 
 function openExModal() {
-    haptic('light'); $('exModal').style.display = 'flex'; $('exSearch').value = ''; filterEx();
+    haptic('light'); 
+    const modal = $('exModal');
+    if(modal) modal.style.display = 'flex'; 
+    const search = $('exSearch');
+    if(search) search.value = ''; 
+    filterEx();
 }
 
 function filterEx() {
-    const q = $('exSearch').value.toLowerCase(); const res = $('exSearchResults'); res.innerHTML = '';
+    const searchInput = $('exSearch');
+    if(!searchInput) return;
+    const q = searchInput.value.toLowerCase(); 
+    const res = $('exSearchResults'); 
+    if(!res) return;
+    res.innerHTML = '';
     EX_DB.filter(ex => ex.toLowerCase().includes(q)).forEach(ex => {
         const div = document.createElement('div');
         div.className = 'p-4 hover:bg-slate-50 rounded-2xl font-bold text-base cursor-pointer border-b border-slate-50';
@@ -410,26 +462,26 @@ function confirmAddEx(name) {
     haptic('success'); save(); render(); closeModal('exModal');
 }
 
-function shareWorkout() {
-    haptic('medium'); const dk = iso(pivotDate); const day = sportData[dk];
-    if (!day || !day.workout || day.workout.length === 0) return alert('Нет тренировок для шеринга!');
-    let tonnage = 0;
-    day.workout.forEach(w => { if(w.sets) w.sets.forEach(s => tonnage += (parseFloat(s.w)||0)*(parseFloat(s.r)||0)); });
-    const text = `🔥 Отличная тренировка!\nТоннаж: ${tonnage} кг\nУпражнений: ${day.workout.length}`;
-    const url = `https://t.me/share/url?url=${encodeURIComponent('https://t.me/your_bot_name/app')}&text=${encodeURIComponent(text)}`;
-    if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openTelegramLink) window.Telegram.WebApp.openTelegramLink(url); else window.open(url, '_blank');
-}
-
 // === КАЛЬКУЛЯТОР 1RM ===
-function openRmModal() { haptic('light'); $('rmModal').style.display = 'flex'; $('rmW').value = ''; $('rmR').value = ''; calcRM(); }
+function openRmModal() { 
+    haptic('light'); 
+    const modal = $('rmModal'); if(modal) modal.style.display = 'flex'; 
+    const w = $('rmW'); if(w) w.value = ''; 
+    const r = $('rmR'); if(r) r.value = ''; 
+    calcRM(); 
+}
 function calcRM() {
-    const w = parseFloat($('rmW').value) || 0, r = parseFloat($('rmR').value) || 0;
+    const wInput = $('rmW'); const rInput = $('rmR');
+    if(!wInput || !rInput) return;
+    const w = parseFloat(wInput.value) || 0, r = parseFloat(rInput.value) || 0;
     if (w > 0 && r > 0) {
         const rm = Math.round(w * (1 + r / 30));
-        $('rmResult').innerText = rm + ' кг';
-        $('rm90').innerText = Math.round(rm * 0.9); $('rm80').innerText = Math.round(rm * 0.8);
-        $('rm70').innerText = Math.round(rm * 0.7); $('rm60').innerText = Math.round(rm * 0.6);
-    } else { $('rmResult').innerText = '0 кг';['rm90','rm80','rm70','rm60'].forEach(id => $(id).innerText = '0'); }
+        setTxt('rmResult', rm + ' кг');
+        setTxt('rm90', Math.round(rm * 0.9)); setTxt('rm80', Math.round(rm * 0.8));
+        setTxt('rm70', Math.round(rm * 0.7)); setTxt('rm60', Math.round(rm * 0.6));
+    } else { 
+        setTxt('rmResult', '0 кг');['rm90','rm80','rm70','rm60'].forEach(id => setTxt(id, '0')); 
+    }
 }
 
 // === МОДУЛЬ ПИТАНИЯ ===
@@ -438,75 +490,109 @@ function renderNutrition(dk) {
     let tc=0, tp=0, tf=0, tu=0, tfib=0;
     dayData.food.forEach(f => { tc+=f.c; tp+=f.p; tf+=f.f; tu+=f.u; tfib+=(f.fib||0); });
     
-    $('calEaten').innerText = tc; $('calLeft').innerText = userGoals.c - tc;
-    $('calGoalDisplay').innerText = userGoals.c;
-    $('pVal').innerText = `${Math.round(tp)}/${userGoals.p}`; 
-    $('fVal').innerText = `${Math.round(tf)}/${userGoals.f}`; 
-    $('cVal').innerText = `${Math.round(tu)}/${userGoals.u}`;
-    $('fibVal').innerText = `${Math.round(tfib)}/${userGoals.fib}`;
+    setTxt('calEaten', tc); 
     
-    let totalM = tp + tf + tu + tfib;
-    $('globalMacroBar').innerHTML = totalM > 0 ? `
-        <div class="bg-green-400" style="width:${(tp/totalM)*100}%"></div>
-        <div class="bg-red-400" style="width:${(tf/totalM)*100}%"></div>
-        <div class="bg-blue-400" style="width:${(tu/totalM)*100}%"></div>
-        <div class="bg-yellow-400" style="width:${(tfib/totalM)*100}%"></div>
-    ` : '';
+    const calLeftEl = $('calLeft');
+    if(calLeftEl) {
+        const left = userGoals.c - tc;
+        calLeftEl.innerText = Math.abs(left);
+        const pEl = calLeftEl.parentElement.querySelector('p');
+        if (left < 0) {
+            if(pEl) { pEl.innerText = 'ПЕРЕБОР'; pEl.classList.add('text-red-200'); }
+            calLeftEl.classList.add('text-red-100');
+        } else {
+            if(pEl) { pEl.innerText = 'ОСТАЛОСЬ'; pEl.classList.remove('text-red-200'); }
+            calLeftEl.classList.remove('text-red-100');
+        }
+    }
+    
+    setTxt('calGoalDisplay', userGoals.c);
+    setTxt('pVal', `${Math.round(tp)} / ${userGoals.p}г`); 
+    setTxt('fVal', `${Math.round(tf)} / ${userGoals.f}г`); 
+    setTxt('cVal', `${Math.round(tu)} / ${userGoals.u}г`);
+    setTxt('fibVal', `${Math.round(tfib)} / ${userGoals.fib}г`);
+    
+    const calPct = Math.min((tc / userGoals.c) * 100, 100);
+    const circle = $('calCircle');
+    if(circle) {
+        circle.style.setProperty('--p', `${calPct}%`);
+        if(tc > userGoals.c) circle.classList.add('over'); else circle.classList.remove('over');
+    }
+
+    const updateMacroBar = (id, val, goal) => {
+        const pct = Math.min((val / goal) * 100, 100);
+        const bar = $(id);
+        if(bar) {
+            bar.style.width = `${pct}%`;
+            if(val > goal) bar.classList.add('over'); else bar.classList.remove('over');
+        }
+    };
+    updateMacroBar('pBar', tp, userGoals.p);
+    updateMacroBar('fBar', tf, userGoals.f);
+    updateMacroBar('cBar', tu, userGoals.u);
+    updateMacroBar('fibBar', tfib, userGoals.fib);
 
     const waterVal = dayData.water || 0;
-    $('waterVal').innerHTML = `${waterVal} <span class="text-lg opacity-50">/ ${userGoals.water}</span>`;
+    const waterValEl = $('waterVal');
+    if(waterValEl) waterValEl.innerHTML = `${waterVal} <span class="text-lg opacity-50">/ ${userGoals.water}</span>`;
     const waterPct = Math.min((waterVal / userGoals.water) * 100, 100);
-    $('waterFill').style.height = `${waterPct}%`;
+    const waterFill = $('waterFill');
+    if(waterFill) waterFill.style.height = `${waterPct}%`;
 
     const list = $('foodList');
+    if(!list) return;
     list.innerHTML = dayData.activeMeals.map(meal => {
         const items = dayData.food.filter(f => f.type === meal);
         let mc=0, mp=0, mf=0, mu=0, mfib=0; 
         items.forEach(i => { mc+=i.c; mp+=i.p; mf+=i.f; mu+=i.u; mfib+=(i.fib||0); });
         
+        let mealTime = '';
+        if (items.length > 0 && items[0].time) mealTime = `<span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-lg ml-2">${items[0].time}</span>`;
+
         let mTotal = mp + mf + mu + mfib;
         let mealBar = mTotal > 0 ? `
             <div class="flex h-1.5 w-full rounded-full overflow-hidden mt-3 opacity-80">
-                <div class="bg-green-500" style="width:${(mp/mTotal)*100}%"></div>
-                <div class="bg-red-500" style="width:${(mf/mTotal)*100}%"></div>
-                <div class="bg-blue-500" style="width:${(mu/mTotal)*100}%"></div>
-                <div class="bg-yellow-500" style="width:${(mfib/mTotal)*100}%"></div>
+                <div class="bg-green-400" style="width:${(mp/mTotal)*100}%"></div>
+                <div class="bg-purple-500" style="width:${(mf/mTotal)*100}%"></div>
+                <div class="bg-blue-400" style="width:${(mu/mTotal)*100}%"></div>
+                <div class="bg-yellow-400" style="width:${(mfib/mTotal)*100}%"></div>
             </div>
         ` : '';
 
         return `
         <div class="card">
-            <div class="flex justify-between items-center mb-3">
-                <h4 class="font-black text-xl">${meal}</h4>
-                <div class="flex items-center gap-2">
-                    <span class="text-sm font-bold text-slate-400 mr-2">${mc} ккал</span>
-                    <button onclick="openSaveTplModal('meal', '${meal}')" class="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-floppy-disk"></i></button>
-                    <button onclick="openLoadTplModal('meal', '${meal}')" class="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-folder-open"></i></button>
-                    <button onclick="openFoodModal('${meal}')" class="w-10 h-10 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center text-lg"><i class="fa-solid fa-plus"></i></button>
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <div class="flex items-center">
+                        <h4 class="font-black text-xl">${meal}</h4>
+                        ${mealTime}
+                    </div>
+                    <p class="text-[11px] font-bold text-slate-400 mt-1">
+                        <span class="text-slate-600">${mc} ккал</span> • Б:${mp} Ж:${mf} У:${mu} Кл:${mfib}
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    <button onclick="openSaveTplModal('meal', '${meal}')" class="w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-floppy-disk"></i></button>
+                    <button onclick="openLoadTplModal('meal', '${meal}')" class="w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center"><i class="fa-solid fa-folder-open"></i></button>
+                    <button onclick="openFoodModal('${meal}')" class="w-10 h-10 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center text-lg shadow-sm"><i class="fa-solid fa-plus"></i></button>
                 </div>
             </div>
             ${mealBar}
-            <div class="space-y-3 mt-4">
-                ${items.length === 0 ? '<p class="text-sm text-slate-300 font-bold">Пусто</p>' : items.map(f => {
-                    let fTotal = f.p + f.f + f.u + (f.fib||0);
-                    let foodBar = fTotal > 0 ? `
-                        <div class="flex h-1 w-full rounded-full overflow-hidden mt-2 opacity-60">
-                            <div class="bg-green-500" style="width:${(f.p/fTotal)*100}%"></div>
-                            <div class="bg-red-500" style="width:${(f.f/fTotal)*100}%"></div>
-                            <div class="bg-blue-500" style="width:${(f.u/fTotal)*100}%"></div>
-                            <div class="bg-yellow-500" style="width:${((f.fib||0)/fTotal)*100}%"></div>
-                        </div>
-                    ` : '';
+            <div class="space-y-2 mt-4">
+                ${items.length === 0 ? '<p class="text-sm text-slate-300 font-bold text-center py-2">Пусто</p>' : items.map(f => {
                     return `
-                    <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl">
-                        <div class="flex-1 mr-4">
-                            <p class="font-bold text-base">${f.n}</p>
-                            <p class="text-xs text-slate-400 font-bold mt-1">${f.w}${f.n.includes('шт') ? 'шт' : 'г'} • Б:${f.p} Ж:${f.f} У:${f.u} Кл:${f.fib||0}</p>
-                            ${foodBar}
+                    <div class="flex justify-between items-center bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                        <div class="flex-1 pr-4">
+                            <p class="font-bold text-base text-slate-800">${f.n}</p>
+                            <p class="text-[11px] text-slate-500 font-bold mt-1 flex gap-2">
+                                <span>Б:${f.p} Ж:${f.f} У:${f.u} Кл:${f.fib||0}</span>
+                                <span>•</span>
+                                <span class="text-slate-700">${f.c} ккал</span>
+                            </p>
                         </div>
-                        <div class="flex items-center gap-4">
-                            <span class="font-black text-lg">${f.c}</span>
-                            <button onclick="deleteFood(${dayData.food.indexOf(f)})" class="text-slate-300 hover:text-red-500 text-lg"><i class="fa-solid fa-xmark"></i></button>
+                        <div class="flex items-center gap-3">
+                            <span class="font-black text-sm text-slate-400">${f.w}${f.n.includes('шт') ? 'шт' : 'г'}</span>
+                            <button onclick="deleteFood(${dayData.food.indexOf(f)})" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white rounded-full shadow-sm transition"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
                 `}).join('')}
@@ -519,30 +605,43 @@ function addWater(amount) { haptic('light'); const dk = iso(pivotDate); sportDat
 
 function openGoalModal() {
     haptic('light');
-    $('goalC').value = userGoals.c; $('goalP').value = userGoals.p; $('goalF').value = userGoals.f;
-    $('goalU').value = userGoals.u; $('goalFib').value = userGoals.fib; $('goalWater').value = userGoals.water;
-    $('goalModal').style.display = 'flex';
+    const modal = $('goalModal'); if(!modal) return;
+    const setVal = (id, val) => { const el = $(id); if(el) el.value = val; };
+    setVal('goalC', userGoals.c); setVal('goalP', userGoals.p); setVal('goalF', userGoals.f);
+    setVal('goalU', userGoals.u); setVal('goalFib', userGoals.fib); setVal('goalWater', userGoals.water);
+    modal.style.display = 'flex';
 }
 
 function saveGoals() {
+    const getVal = (id, def) => { const el = $(id); return el ? (parseInt(el.value)||def) : def; };
     userGoals = {
-        c: parseInt($('goalC').value)||2500, p: parseInt($('goalP').value)||160, f: parseInt($('goalF').value)||70,
-        u: parseInt($('goalU').value)||300, fib: parseInt($('goalFib').value)||30, water: parseInt($('goalWater').value)||2000
+        c: getVal('goalC', 2500), p: getVal('goalP', 160), f: getVal('goalF', 70),
+        u: getVal('goalU', 300), fib: getVal('goalFib', 30), water: getVal('goalWater', 2000)
     };
-    // БЕЗОПАСНОЕ СОХРАНЕНИЕ ЦЕЛЕЙ
     try { localStorage.setItem('tma_user_goals', JSON.stringify(userGoals)); } catch(e){}
     haptic('success'); render(); closeModal('goalModal');
 }
 
 function openFoodModal(meal) {
-    haptic('light'); currentMealForAdd = meal; $('foodMealType').value = meal; $('foodModal').style.display = 'flex';
-    selectedFoodBase = null; $('foodSearch').value = ''; $('customFoodName').value = ''; $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = '100';
+    haptic('light'); currentMealForAdd = meal; 
+    const typeEl = $('foodMealType'); if(typeEl) typeEl.value = meal; 
+    const modal = $('foodModal'); if(modal) modal.style.display = 'flex';
+    selectedFoodBase = null; 
+    const search = $('foodSearch'); if(search) search.value = ''; 
+    const name = $('customFoodName'); if(name) name.value = ''; 
+    setTxt('customFoodWeightLabel', 'Вес (г)'); 
+    const w = $('customFoodWeight'); if(w) w.value = '100';
     calcFood(); filterFood();
 }
 
 let searchTimeout;
 function filterFood() {
-    const q = $('foodSearch').value.toLowerCase(); const res = $('foodSearchResults'); res.innerHTML = '';
+    const searchInput = $('foodSearch');
+    if(!searchInput) return;
+    const q = searchInput.value.toLowerCase(); 
+    const res = $('foodSearchResults'); 
+    if(!res) return;
+    res.innerHTML = '';
     if(!q) return;
     
     FOOD_DB.filter(f => f.n.toLowerCase().includes(q)).forEach(f => {
@@ -556,8 +655,11 @@ function filterFood() {
             <span class="text-slate-400 text-sm">${f.c} ккал</span>
         `;
         div.onclick = () => {
-            selectedFoodBase = f; $('customFoodName').value = f.n; 
-            const isPiece = f.n.includes('шт'); $('customFoodWeightLabel').innerText = isPiece ? 'Кол-во (шт)' : 'Вес (г)'; $('customFoodWeight').value = isPiece ? 1 : 100;
+            selectedFoodBase = f; 
+            const nameEl = $('customFoodName'); if(nameEl) nameEl.value = f.n; 
+            const isPiece = f.n.includes('шт'); 
+            setTxt('customFoodWeightLabel', isPiece ? 'Кол-во (шт)' : 'Вес (г)'); 
+            const wEl = $('customFoodWeight'); if(wEl) wEl.value = isPiece ? 1 : 100;
             calcFood(); res.innerHTML = ''; 
         };
         res.appendChild(div);
@@ -569,6 +671,7 @@ function filterFood() {
 
 async function searchFoodOnline(q) {
     const res = $('foodSearchResults');
+    if(!res) return;
     try {
         const resp = await fetch(`https://ru.openfoodfacts.org/cgi/search.pl?search_terms=${q}&search_simple=1&action=process&json=1&page_size=5&fields=product_name,nutriments,image_front_small_url`);
         const data = await resp.json();
@@ -597,8 +700,10 @@ async function searchFoodOnline(q) {
                     <span class="text-blue-400 text-sm">${f.c} ккал</span>
                 `;
                 div.onclick = () => {
-                    selectedFoodBase = f; $('customFoodName').value = f.n; 
-                    $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = 100;
+                    selectedFoodBase = f; 
+                    const nameEl = $('customFoodName'); if(nameEl) nameEl.value = f.n; 
+                    setTxt('customFoodWeightLabel', 'Вес (г)'); 
+                    const wEl = $('customFoodWeight'); if(wEl) wEl.value = 100;
                     calcFood(); res.innerHTML = ''; 
                 };
                 res.appendChild(div);
@@ -611,30 +716,45 @@ function onWeightChange() { calcFood(); }
 function onMacroChange() { selectedFoodBase = null; calcFood(); }
 
 function calcFood() {
-    const w = parseFloat($('customFoodWeight').value) || 0;
+    const wInput = $('customFoodWeight');
+    if(!wInput) return;
+    const w = parseFloat(wInput.value) || 0;
+    
+    const setVal = (id, val) => { const el = $(id); if(el) el.value = val; };
+    
     if (selectedFoodBase) {
         const multiplier = selectedFoodBase.n.includes('шт') ? w : w / 100;
-        $('customFoodP').value = Math.round(selectedFoodBase.p * multiplier);
-        $('customFoodF').value = Math.round(selectedFoodBase.f * multiplier);
-        $('customFoodU').value = Math.round(selectedFoodBase.u * multiplier);
-        $('customFoodFib').value = Math.round((selectedFoodBase.fib || 0) * multiplier);
-        $('customFoodC').value = Math.round(selectedFoodBase.c * multiplier);
+        setVal('customFoodP', Math.round(selectedFoodBase.p * multiplier));
+        setVal('customFoodF', Math.round(selectedFoodBase.f * multiplier));
+        setVal('customFoodU', Math.round(selectedFoodBase.u * multiplier));
+        setVal('customFoodFib', Math.round((selectedFoodBase.fib || 0) * multiplier));
+        setVal('customFoodC', Math.round(selectedFoodBase.c * multiplier));
     } else {
-        const p = parseFloat($('customFoodP').value)||0, f = parseFloat($('customFoodF').value)||0, u = parseFloat($('customFoodU').value)||0;
-        $('customFoodC').value = Math.round((p*4 + f*9 + u*4));
+        const getVal = (id) => { const el = $(id); return el ? (parseFloat(el.value)||0) : 0; };
+        const p = getVal('customFoodP'), f = getVal('customFoodF'), u = getVal('customFoodU');
+        setVal('customFoodC', Math.round((p*4 + f*9 + u*4)));
     }
 }
 
 function confirmAddFood() {
     try {
-        const name = $('customFoodName').value;
+        const nameEl = $('customFoodName');
+        if(!nameEl) return;
+        const name = nameEl.value;
         if(!name) { alert('Введите название!'); return; }
         const dk = iso(pivotDate);
+        
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        
+        const getVal = (id, def) => { const el = $(id); return el ? (parseFloat(el.value)||def) : def; };
+        
         sportData[dk].food.push({ 
             type: currentMealForAdd, n: name,
-            w: parseFloat($('customFoodWeight').value)||100, p: parseFloat($('customFoodP').value)||0,
-            f: parseFloat($('customFoodF').value)||0, u: parseFloat($('customFoodU').value)||0, 
-            fib: parseFloat($('customFoodFib').value)||0, c: parseInt($('customFoodC').value)||0 
+            w: getVal('customFoodWeight', 100), p: getVal('customFoodP', 0),
+            f: getVal('customFoodF', 0), u: getVal('customFoodU', 0), 
+            fib: getVal('customFoodFib', 0), c: parseInt(getVal('customFoodC', 0)),
+            time: timeStr
         });
         haptic('success'); save(); render(); closeModal('foodModal');
     } catch(e) { console.error(e); }
@@ -647,9 +767,10 @@ let isScanning = false;
 function scanBarcode() {
     haptic('heavy');
     const container = $('scanner-container');
+    if(!container) return;
     
     if (isScanning) {
-        Quagga.stop(); isScanning = false; container.style.display = 'none'; return;
+        stopScanner(); return;
     }
     
     container.style.display = 'block';
@@ -659,20 +780,34 @@ function scanBarcode() {
         inputStream: { name: "Live", type: "LiveStream", target: container },
         decoder: { readers:["ean_reader", "ean_8_reader"] }
     }, function(err) {
-        if (err) { alert('Ошибка камеры'); container.style.display = 'none'; isScanning = false; return; }
+        if (err) { alert('Ошибка камеры'); stopScanner(); return; }
         Quagga.start();
     });
     
     Quagga.onDetected(function(result) {
         if(!isScanning) return;
         const code = result.codeResult.code;
-        Quagga.stop(); isScanning = false; container.style.display = 'none';
+        stopScanner();
+        
+        const searchEl = $('foodSearch');
+        if(searchEl) searchEl.value = code;
+        
         fetchProductByCode(code);
     });
 }
 
+function stopScanner() {
+    if (isScanning) {
+        Quagga.stop(); 
+        isScanning = false; 
+        const container = $('scanner-container');
+        if(container) container.style.display = 'none'; 
+    }
+}
+
 async function fetchProductByCode(code) {
-    $('foodSearch').value = 'Ищем в базе...';
+    const searchEl = $('foodSearch');
+    if(searchEl) searchEl.value = 'Ищем в базе...';
     try {
         const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
         const data = await res.json();
@@ -686,14 +821,18 @@ async function fetchProductByCode(code) {
                 fib: Math.round(p.nutriments.fiber_100g || 0),
                 c: Math.round(p.nutriments['energy-kcal'] || 0)
             };
-            $('customFoodName').value = selectedFoodBase.n;
-            $('customFoodWeightLabel').innerText = 'Вес (г)'; $('customFoodWeight').value = '100';
-            calcFood(); $('foodSearch').value = ''; haptic('success');
+            const nameEl = $('customFoodName'); if(nameEl) nameEl.value = selectedFoodBase.n;
+            setTxt('customFoodWeightLabel', 'Вес (г)'); 
+            const wEl = $('customFoodWeight'); if(wEl) wEl.value = '100';
+            calcFood(); 
+            if(searchEl) searchEl.value = ''; 
+            haptic('success');
         } else { 
             alert('Продукт не найден в базе OpenFoodFacts.'); 
-            $('foodSearch').value = code; haptic('error'); 
+            if(searchEl) searchEl.value = code; 
+            haptic('error'); 
         }
-    } catch(e) { alert('Ошибка сети при поиске штрих-кода.'); $('foodSearch').value = ''; }
+    } catch(e) { alert('Ошибка сети при поиске штрих-кода.'); if(searchEl) searchEl.value = ''; }
 }
 
 // === МОДУЛЬ АНАЛИТИКИ И КАЛЕНДАРЯ ===
@@ -721,106 +860,119 @@ function renderAnalytics() {
         }
     }
     
-    $('statTotalWo').innerText = totalWo;
-    $('statTonnage').innerHTML = (totalTon / 1000).toFixed(1) + '<span class="text-sm">т</span>';
+    setTxt('statTotalWo', totalWo);
+    const tonEl = $('statTonnage');
+    if(tonEl) tonEl.innerHTML = (totalTon / 1000).toFixed(1) + '<span class="text-sm">т</span>';
     
-    // ПУНКТ 5: График БЖУК за 7 дней (Группированный)
+    const calGoals = Array(7).fill(userGoals.c);
+    drawChart('chartCalsLine', 'line', {
+        labels: dates,
+        datasets:[
+            { label: 'Съедено', data: cals, borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 },
+            { label: 'Цель', data: calGoals, borderColor: '#94a3b8', borderDash: [5, 5], pointRadius: 0, fill: false }
+        ]
+    });
+    
     drawChart('chartCals', 'bar', { 
         labels: dates, 
         datasets:[
-            { label: 'Белки', data: p, backgroundColor: '#22c55e', borderRadius: 2 },
-            { label: 'Жиры', data: f, backgroundColor: '#ef4444', borderRadius: 2 },
-            { label: 'Углеводы', data: u, backgroundColor: '#3b82f6', borderRadius: 2 },
-            { label: 'Клетчатка', data: fib, backgroundColor: '#eab308', borderRadius: 2 }
+            { label: 'Белки', data: p, backgroundColor: '#4ade80', borderRadius: 2 },
+            { label: 'Жиры', data: f, backgroundColor: '#a855f7', borderRadius: 2 },
+            { label: 'Углеводы', data: u, backgroundColor: '#60a5fa', borderRadius: 2 },
+            { label: 'Клетчатка', data: fib, backgroundColor: '#facc15', borderRadius: 2 }
         ] 
     }, { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { display: false } } } });
+    
+    // ДОБАВЛЕНО: График потребления воды за 7 дней
+    const waterDates = [], waterData =[];
+    for(let i=6; i>=0; i--) {
+        const d = new Date(now); d.setDate(now.getDate() - i);
+        waterDates.push(d.toLocaleDateString('ru-RU', {weekday:'short'}));
+        waterData.push((sportData[iso(d)]?.water || 0));
+    }
+    drawChart('chartWater', 'bar', {
+        labels: waterDates,
+        datasets:[{ label: 'Вода (мл)', data: waterData, backgroundColor: '#3b82f6', borderRadius: 4 }]
+    });
     
     const avgP = p.reduce((a,b)=>a+b,0)/7, avgF = f.reduce((a,b)=>a+b,0)/7, avgU = u.reduce((a,b)=>a+b,0)/7;
     drawChart('chartMacros', 'doughnut', {
         labels:['Белки', 'Жиры', 'Углеводы'],
-        datasets:[{ data:[avgP, avgF, avgU], backgroundColor:['#22c55e', '#ef4444', '#3b82f6'], borderWidth: 0 }]
+        datasets:[{ data:[avgP, avgF, avgU], backgroundColor:['#4ade80', '#a855f7', '#60a5fa'], borderWidth: 0 }]
     }, { cutout: '70%', plugins: { legend: { position: 'right' } } });
 
-    renderCalendar();
     populateExSelect();
 }
 
-function toggleCalendar() {
-    const wrap = $('calendarWrapper');
-    const icon = $('calToggleIcon');
-    if(wrap.style.maxHeight === '0px' || wrap.style.maxHeight === '') {
-        wrap.style.maxHeight = '300px';
-        icon.style.transform = 'rotate(180deg)';
-    } else {
-        wrap.style.maxHeight = '0px';
-        icon.style.transform = 'rotate(0deg)';
-    }
-}
-
-function changeCalMonth(delta) { haptic('light'); calPivot.setMonth(calPivot.getMonth() + delta); renderCalendar(); }
-
-function renderCalendar() {
-    const grid = $('analyticsCalendar');
-    if(!grid) return;
-    grid.innerHTML = '';
-    
-    const year = calPivot.getFullYear();
-    const month = calPivot.getMonth();
-    $('calMonthLabel').innerText = calPivot.toLocaleDateString('ru-RU', {month: 'long', year: 'numeric'});
-    $('calCurrentDateBadge').innerText = new Date().toLocaleDateString('ru-RU', {day: 'numeric', month: 'short'});
-    
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    let startDay = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
-    
-    for(let i=0; i<startDay; i++) grid.innerHTML += `<div></div>`;
-    
-    for(let i=1; i<=lastDay.getDate(); i++) {
-        const d = new Date(year, month, i);
-        const dk = iso(d);
-        const dayData = sportData[dk];
-        const hasWorkout = dayData && dayData.workout && dayData.workout.length > 0;
-        const isToday = dk === iso(new Date());
-        
-        let bgClass = 'bg-slate-50 text-slate-600';
-        if(hasWorkout) bgClass = 'bg-blue-100 text-blue-600 font-black border border-blue-200';
-        if(isToday) bgClass += ' ring-2 ring-orange-400';
-        
-        grid.innerHTML += `<div onclick="openDayDetails('${dk}')" class="h-10 rounded-xl flex items-center justify-center text-xs cursor-pointer ${bgClass}">${i}</div>`;
-    }
-}
-
-function openDayDetails(dk) {
+// === ШАБЛОНЫ ===
+function openSaveTplModal(type, mealType = '') {
     haptic('light');
-    const dayData = sportData[dk];
-    const content = $('dayModalContent');
-    $('dayModalTitle').innerText = new Date(dk).toLocaleDateString('ru-RU', {day:'numeric', month:'long'});
-    
-    if(!dayData || (!dayData.workout.length && !dayData.food.length)) {
-        content.innerHTML = '<p class="text-center text-slate-400 text-sm py-4">Нет данных за этот день</p>';
-    } else {
-        let html = '';
-        if(dayData.workout.length > 0) {
-            let ton = 0;
-            dayData.workout.forEach(w => {
-                if(w.sets) w.sets.forEach(s => ton += (parseFloat(s.w)||0)*(parseFloat(s.r)||0));
-            });
-            html += `<h4 class="font-black text-sm mb-2 text-blue-500"><i class="fa-solid fa-dumbbell"></i> Тренировка (${ton} кг)</h4>`;
-            dayData.workout.forEach(w => {
-                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl mb-2 flex justify-between items-center"><span>${w.name}</span><span class="bg-white px-2 py-1 rounded-lg shadow-sm">${w.sets?.length||0} подх.</span></div>`;
-            });
-        }
-        if(dayData.food.length > 0) {
-            let cal = 0;
-            dayData.food.forEach(f => cal += f.c);
-            html += `<h4 class="font-black text-sm mt-4 mb-2 text-orange-500"><i class="fa-solid fa-utensils"></i> Питание (${cal} ккал)</h4>`;
-            dayData.food.forEach(f => {
-                html += `<div class="text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl mb-2 flex justify-between items-center"><span>${f.n}</span><span class="bg-white px-2 py-1 rounded-lg shadow-sm">${f.c} ккал</span></div>`;
-            });
-        }
-        content.innerHTML = html;
+    currentTplType = type; currentMealForAdd = mealType;
+    const dk = iso(pivotDate);
+    if(type === 'workout' && sportData[dk].workout.length === 0) return alert('Тренировка пуста!');
+    if(type === 'meal' && sportData[dk].food.filter(f => f.type === mealType).length === 0) return alert('Прием пищи пуст!');
+    const nameEl = $('tplNameInput'); if(nameEl) nameEl.value = type === 'meal' ? mealType : '';
+    const modal = $('saveTplModal'); if(modal) modal.style.display = 'flex';
+}
+
+function confirmSaveTemplate() {
+    const nameEl = $('tplNameInput');
+    if(!nameEl) return;
+    const name = nameEl.value;
+    if(!name) return alert('Введите название!');
+    const dk = iso(pivotDate);
+    if(currentTplType === 'workout') {
+        sportData._templates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(sportData[dk].workout)) });
+    } else if(currentTplType === 'meal') {
+        const items = sportData[dk].food.filter(f => f.type === currentMealForAdd);
+        sportData._mealTemplates.push({ id: Date.now(), name: name, items: JSON.parse(JSON.stringify(items)) });
     }
-    $('dayModal').style.display = 'flex';
+    haptic('success'); save(); closeModal('saveTplModal');
+}
+
+function openLoadTplModal(type, mealType = '') {
+    haptic('light');
+    currentTplType = type; currentMealForAdd = mealType;
+    const list = $('tplList'); 
+    if(!list) return;
+    list.innerHTML = '';
+    const tpls = type === 'workout' ? sportData._templates : sportData._mealTemplates;
+    
+    if(!tpls || tpls.length === 0) {
+        list.innerHTML = '<p class="text-center text-slate-400 text-sm font-bold py-4">Нет сохраненных шаблонов</p>';
+    } else {
+        tpls.forEach(t => {
+            list.innerHTML += `
+            <div class="flex justify-between items-center bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-2 cursor-pointer" onclick="applyTemplate(${t.id})">
+                <div><p class="font-bold text-sm text-slate-700">${t.name}</p><p class="text-[10px] text-slate-400 font-bold">${t.items.length} элементов</p></div>
+                <button onclick="event.stopPropagation(); deleteTemplate(${t.id})" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white rounded-full shadow-sm transition"><i class="fa-solid fa-xmark"></i></button>
+            </div>`;
+        });
+    }
+    const modal = $('loadTplModal'); if(modal) modal.style.display = 'flex';
+}
+
+function applyTemplate(id) {
+    const dk = iso(pivotDate);
+    if(currentTplType === 'workout') {
+        const t = sportData._templates.find(x => x.id === id);
+        if(t) sportData[dk].workout.push(...JSON.parse(JSON.stringify(t.items)));
+    } else if(currentTplType === 'meal') {
+        const t = sportData._mealTemplates.find(x => x.id === id);
+        if(t) {
+            const newItems = JSON.parse(JSON.stringify(t.items)).map(i => ({...i, type: currentMealForAdd}));
+            sportData[dk].food.push(...newItems);
+        }
+    }
+    haptic('success'); save(); render(); closeModal('loadTplModal');
+}
+
+function deleteTemplate(id) {
+    if(confirm('Удалить шаблон?')) {
+        if(currentTplType === 'workout') sportData._templates = sportData._templates.filter(x => x.id !== id);
+        else sportData._mealTemplates = sportData._mealTemplates.filter(x => x.id !== id);
+        save(); openLoadTplModal(currentTplType, currentMealForAdd);
+    }
 }
 
 function populateExSelect() {
@@ -836,7 +988,9 @@ function populateExSelect() {
 }
 
 function renderExProgressChart() {
-    const exName = $('analyticsExSelect').value;
+    const select = $('analyticsExSelect');
+    if(!select) return;
+    const exName = select.value;
     if(!exName) {
         if(charts['chartExProgress']) charts['chartExProgress'].destroy();
         return;
