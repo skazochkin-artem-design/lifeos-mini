@@ -39,12 +39,9 @@
         @keyframes scan { 0% { top: 10%; } 50% { top: 90%; } 100% { top: 10%; } }
         
         .food-img-thumb { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; }
-/* ДИЗАЙН ТРЕНИРОВОК (ИСПРАВЛЕННЫЙ) */
-        .ex-wrapper { display: flex; gap: 12px; position: relative; }
-        .ex-number-col { display: flex; flex-direction: column; align-items: center; width: 24px; flex-shrink: 0; z-index: 2; position: relative; }
-        .ex-number { width: 24px; height: 24px; border-radius: 50%; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 900; position: relative; z-index: 10; }
         
-        .ex-card { background: var(--tg-theme-bg-color, #ffffff); padding: 20px; flex: 1; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid transparent; transition: 0.2s; min-width: 0; }
+        /* ДИЗАЙН ТРЕНИРОВОК (БЕЗ ЦИФР) */
+        .ex-card { background: var(--tg-theme-bg-color, #ffffff); padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border: 1px solid transparent; transition: 0.2s; width: 100%; }
         .ex-card.superset-linked { border-color: rgba(59, 130, 246, 0.2); background: #f8fafc; }
         
         .set-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.04); transition: opacity 0.3s; }
