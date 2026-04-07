@@ -28,6 +28,12 @@ function setSyncStatus(status) {
     else el.innerHTML = '<i class="fa-solid fa-cloud text-slate-300"></i>';
 }
 
+// --- БЕЗОПАСНАЯ РАБОТА С ПАМЯТЬЮ ---
+const safeStorage = {
+    get: function(key) { try { return localStorage.getItem(key); } catch(e) { return null; } },
+    set: function(key, value) { try { localStorage.setItem(key, value); } catch(e) { console.warn('Storage blocked'); } }
+};
+
 const EX_DB =["Жим лежа","Жим гантелей","Жим на наклонной","Разводка гантелей","Отжимания","Отжимания на брусьях","Сведение рук в кроссовере","Пуловер","Приседания со штангой","Фронтальные приседания","Жим ногами","Выпады","Разгибания ног","Сгибания ног","Сведение ног в тренажере","Разведение ног в тренажере","Гакк-присед","Приседания в Смите","Румынская тяга","Становая тяга","Тяга в наклоне","Тяга блока к груди","Тяга нижнего блока","Подтягивания","Тяга гантели одной рукой","Гиперэкстензия","Тяга Т-грифа","Армейский жим","Жим Арнольда","Махи в стороны","Махи перед собой","Тяга к подбородку","Обратные разводки (задняя дельта)","Жим сидя в Смите","Подъем на бицепс (штанга)","Подъем гантелей на бицепс","Молотки","Концентрированный подъем","Сгибания на нижнем блоке","Французский жим","Разгибания на блоке","Разгибания из-за головы","Отжимания узким хватом","Планка","Скручивания","Подъем ног в висе","Русский твист","Молитва (пресс)","Бег","Эллипс","Велотренажер","Гребля","Скакалка","Берпи","Степпер","Ходьба"].sort();
 const CARDIO_LIST =['бег', 'эллипс', 'велотренажер', 'гребля', 'скакалка', 'берпи', 'ходьба', 'степпер'];
 
@@ -58,9 +64,10 @@ const FOOD_DB =[
 // --- СОСТОЯНИЕ ---
 let pivotDate = new Date();
 let currentTab = 'sport';
+
 let userGoals = { c: 2500, p: 160, f: 70, u: 300, fib: 30, water: 2000 };
 try {
-    const savedGoals = localStorage.getItem('tma_user_goals');
+    const savedGoals = safeStorage.get('tma_user_goals');
     if (savedGoals) userGoals = JSON.parse(savedGoals);
 } catch(e) {}
 
@@ -69,7 +76,6 @@ let charts = {};
 let calPivot = new Date();
 
 let selectedFoodBase = null;
-let isCardioSelected = false;
 let currentTplType = 'workout'; 
 let currentMealForAdd = '';
 let isSupersetMode = false;
@@ -102,7 +108,7 @@ function migrateData() {
 async function initData() {
     setSyncStatus('loading');
     try { 
-        const localData = localStorage.getItem('tma_sport_data');
+        const localData = safeStorage.get('tma_sport_data');
         sportData = localData ? JSON.parse(localData) : {}; 
     } catch(e) { sportData = {}; }
     
@@ -119,7 +125,7 @@ async function initData() {
             if (data && data.data) {
                 sportData = data.data;
                 migrateData(); 
-                try { localStorage.setItem('tma_sport_data', JSON.stringify(sportData)); } catch(e){}
+                safeStorage.set('tma_sport_data', JSON.stringify(sportData));
                 render(); 
                 setSyncStatus('success');
             } else setSyncStatus('idle');
@@ -129,7 +135,7 @@ async function initData() {
 
 function save() {
     try {
-        localStorage.setItem('tma_sport_data', JSON.stringify(sportData));
+        safeStorage.set('tma_sport_data', JSON.stringify(sportData));
         setTimeout(() => {
             setSyncStatus('loading');
             const tgUser = (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) ? window.Telegram.WebApp.initDataUnsafe.user : { id: 123456789 };
@@ -229,7 +235,6 @@ function render() {
     if (currentTab === 'analytics') renderAnalytics();
 }
 
-
 // === МОДУЛЬ СПОРТА ===
 function renderSport(dk) {
     const list = $('workoutList');
@@ -272,6 +277,11 @@ function renderSport(dk) {
 
         const expandedHtml = `
             <div id="ex-body-${ex.id}" class="mt-4 hidden">
+                ${ex.note !== undefined ? `
+                    <div class="mb-4 flex gap-2">
+                        <input type="text" value="${ex.note}" onchange="updateExNote('${ex.id}', this.value)" placeholder="Заметка к упражнению..." class="custom-input text-sm py-3 flex-1 bg-yellow-50 text-yellow-900 placeholder-yellow-700/50">
+                    </div>
+                ` : ''}
                 <div class="space-y-2">
                     ${ex.sets.map((s, sIdx) => `
                         <div>
@@ -287,7 +297,7 @@ function renderSport(dk) {
                                 </div>
                                 <div class="flex items-center gap-1 ml-2">
                                     <button onclick="makeDropSet('${ex.id}', '${s.id}')" class="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-1.5 rounded-lg uppercase tracking-wider">Дроп</button>
-                                    <button onclick="deleteSet('${ex.id}', '${s.id}')" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-trash text-sm"></i></button>
+                                    <button onclick="deleteSet('${ex.id}', '${s.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white border border-slate-100 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>
                                 </div>
                             </div>
                             ${s.isDrop ? `
@@ -299,7 +309,7 @@ function renderSport(dk) {
                                                 <span class="text-slate-300 font-black text-lg mx-1">×</span>
                                                 <input type="number" value="${d.r}" onchange="updateDropVal('${ex.id}', '${s.id}', ${dIdx}, 'r', this.value)" class="set-input bg-white" placeholder="-">
                                             </div>
-                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="text-slate-300 hover:text-red-500 p-2"><i class="fa-solid fa-xmark"></i></button>
+                                            <button onclick="deleteDrop('${ex.id}', '${s.id}', ${dIdx})" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white border border-slate-100 hover:bg-red-50 rounded-full transition ml-2"><i class="fa-solid fa-xmark"></i></button>
                                         </div>
                                     `).join('')}
                                     <button onclick="addDrop('${ex.id}', '${s.id}')" class="text-xs font-bold text-purple-500 bg-purple-50 px-3 py-2 rounded-lg mt-1">+ Сброс веса</button>
@@ -312,19 +322,16 @@ function renderSport(dk) {
                     <button onclick="addSet('${ex.id}')" class="flex-1 bg-slate-100 text-slate-600 py-3 rounded-xl text-sm font-bold hover:bg-slate-200 transition">+ Добавить подход</button>
                     <button onclick="toggleNote('${ex.id}')" class="w-12 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center hover:text-blue-500 transition"><i class="fa-solid fa-pen-to-square"></i></button>
                 </div>
-                ${ex.note !== undefined ? `
-                    <div class="mt-3">
-                        <input type="text" value="${ex.note}" onchange="updateExNote('${ex.id}', this.value)" placeholder="Заметка к упражнению..." class="custom-input text-sm py-3 w-full bg-blue-50 text-blue-900 border border-blue-100">
-                    </div>
-                ` : ''}
             </div>
         `;
 
+        const isSelected = selectedForSuperset.includes(ex.id);
+
         return `
-        <div class="ex-card" style="margin-bottom: ${mb}; border-radius: ${br}; ${ssStyle}">
-            ${isSupersetMode ? `<input type="checkbox" class="absolute right-5 top-5 w-6 h-6 accent-blue-500 z-10" onchange="toggleSupersetSelection('${ex.id}', this.checked)">` : ''}
+        <div class="ex-card ${isSelected ? 'ring-2 ring-blue-500' : ''}" style="margin-bottom: ${mb}; border-radius: ${br}; ${ssStyle}">
+            ${isSupersetMode ? `<input type="checkbox" class="absolute right-5 top-5 w-6 h-6 accent-blue-500 z-10 pointer-events-none" ${isSelected ? 'checked' : ''}>` : ''}
             
-            <div class="flex justify-between items-start cursor-pointer" onclick="toggleExExpand('${ex.id}')">
+            <div class="flex justify-between items-start cursor-pointer" onclick="${isSupersetMode ? `toggleSupersetSelection('${ex.id}')` : `toggleExExpand('${ex.id}')`}">
                 <div class="flex-1 pr-8">
                     <div class="flex items-center gap-2">
                         <h4 class="font-black text-xl text-slate-800 leading-tight">${ex.name}</h4>
@@ -335,25 +342,14 @@ function renderSport(dk) {
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    ${ex.supersetId ? `<button onclick="event.stopPropagation(); removeFromSuperset('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-orange-500 bg-slate-50 hover:bg-orange-50 rounded-full transition" title="Убрать из суперсета"><i class="fa-solid fa-link-slash text-xs"></i></button>` : ''}
-                    <button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>
+                    ${!isSupersetMode && ex.supersetId ? `<button onclick="event.stopPropagation(); removeFromSuperset('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-orange-500 bg-slate-50 hover:bg-orange-50 rounded-full transition" title="Убрать из суперсета"><i class="fa-solid fa-link-slash text-xs"></i></button>` : ''}
+                    ${!isSupersetMode ? `<button onclick="event.stopPropagation(); deleteExercise('${ex.id}')" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-slate-50 hover:bg-red-50 rounded-full transition"><i class="fa-solid fa-xmark"></i></button>` : ''}
                 </div>
             </div>
-            ${expandedHtml}
+            ${!isSupersetMode ? expandedHtml : ''}
         </div>
         `;
     }).join('');
-}
-
-function removeFromSuperset(id) {
-    haptic('medium');
-    const dk = iso(pivotDate);
-    const ex = sportData[dk].workout.find(w => w.id === id);
-    if(ex) {
-        ex.supersetId = null;
-        save();
-        render();
-    }
 }
 
 function toggleExExpand(id) {
@@ -427,7 +423,15 @@ function toggleSupersetMode() {
     render();
 }
 
-function toggleSupersetSelection(id, isChecked) { if(isChecked) selectedForSuperset.push(id); else selectedForSuperset = selectedForSuperset.filter(x => x !== id); }
+function toggleSupersetSelection(id) { 
+    haptic('light');
+    if(selectedForSuperset.includes(id)) {
+        selectedForSuperset = selectedForSuperset.filter(x => x !== id); 
+    } else {
+        selectedForSuperset.push(id);
+    }
+    render(); 
+}
 
 function cancelSuperset() { 
     isSupersetMode = false; selectedForSuperset =[]; 
@@ -441,8 +445,23 @@ function confirmSuperset() {
     if(selectedForSuperset.length < 2) return alert('Выберите минимум 2 упражнения!');
     const dk = iso(pivotDate); const ssId = 'ss_' + Date.now();
     sportData[dk].workout.forEach(w => { if(selectedForSuperset.includes(w.id)) w.supersetId = ssId; });
-    sportData[dk].workout.sort((a, b) => { if(a.supersetId === ssId && b.supersetId !== ssId) return -1; if(a.supersetId !== ssId && b.supersetId === ssId) return 1; return 0; });
+    sportData[dk].workout.sort((a, b) => { 
+        if(a.supersetId === ssId && b.supersetId !== ssId) return -1; 
+        if(a.supersetId !== ssId && b.supersetId === ssId) return 1; 
+        return 0; 
+    });
     save(); cancelSuperset();
+}
+
+function removeFromSuperset(id) {
+    haptic('medium');
+    const dk = iso(pivotDate);
+    const ex = sportData[dk].workout.find(w => w.id === id);
+    if(ex) {
+        ex.supersetId = null;
+        save();
+        render();
+    }
 }
 
 function openExModal() {
@@ -577,10 +596,10 @@ function renderNutrition(dk) {
         let mTotal = mp + mf + mu + mfib;
         let mealBar = mTotal > 0 ? `
             <div class="flex h-1.5 w-full rounded-full overflow-hidden mt-3 opacity-80">
-                <div class="bg-green-400" style="width:${(mp/mTotal)*100}%"></div>
+                <div class="bg-green-500" style="width:${(mp/mTotal)*100}%"></div>
                 <div class="bg-purple-500" style="width:${(mf/mTotal)*100}%"></div>
-                <div class="bg-blue-400" style="width:${(mu/mTotal)*100}%"></div>
-                <div class="bg-yellow-400" style="width:${(mfib/mTotal)*100}%"></div>
+                <div class="bg-blue-500" style="width:${(mu/mTotal)*100}%"></div>
+                <div class="bg-yellow-500" style="width:${(mfib/mTotal)*100}%"></div>
             </div>
         ` : '';
 
@@ -615,8 +634,7 @@ function renderNutrition(dk) {
                                 <span class="text-slate-700">${f.c} ккал</span>
                             </p>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <span class="font-black text-sm text-slate-400">${f.w}${f.n.includes('шт') ? 'шт' : 'г'}</span>
+                        <div class="flex items-center">
                             <button onclick="deleteFood(${dayData.food.indexOf(f)})" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 bg-white rounded-full shadow-sm transition"><i class="fa-solid fa-xmark"></i></button>
                         </div>
                     </div>
@@ -889,26 +907,17 @@ function renderAnalytics() {
     const tonEl = $('statTonnage');
     if(tonEl) tonEl.innerHTML = (totalTon / 1000).toFixed(1) + '<span class="text-sm">т</span>';
     
+    // График калорий (линейный)
     const calGoals = Array(7).fill(userGoals.c);
     drawChart('chartCalsLine', 'line', {
         labels: dates,
         datasets:[
             { label: 'Съедено', data: cals, borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 },
-            { label: 'Цель', data: calGoals, borderColor: '#94a3b8', borderDash: [5, 5], pointRadius: 0, fill: false }
+            { label: 'Цель', data: calGoals, borderColor: '#94a3b8', borderDash:[5, 5], pointRadius: 0, fill: false }
         ]
     });
     
-    drawChart('chartCals', 'bar', { 
-        labels: dates, 
-        datasets:[
-            { label: 'Белки', data: p, backgroundColor: '#4ade80', borderRadius: 2 },
-            { label: 'Жиры', data: f, backgroundColor: '#a855f7', borderRadius: 2 },
-            { label: 'Углеводы', data: u, backgroundColor: '#60a5fa', borderRadius: 2 },
-            { label: 'Клетчатка', data: fib, backgroundColor: '#facc15', borderRadius: 2 }
-        ] 
-    }, { scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { display: false } } } });
-    
-    // ДОБАВЛЕНО: График потребления воды за 7 дней
+    // График потребления воды за 7 дней
     const waterDates = [], waterData =[];
     for(let i=6; i>=0; i--) {
         const d = new Date(now); d.setDate(now.getDate() - i);
